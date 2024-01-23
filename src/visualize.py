@@ -1,6 +1,7 @@
 
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import networkx as nx
 import gravis as gv
 import numpy as np
@@ -73,3 +74,43 @@ def visualize_dag(transmat, node_hover_dict: Dict = None,
                  node_hover_tooltip=True, edge_hover_tooltip=True,
                  use_many_body_force_max_distance=True, node_drag_fix=True,
                  layout_algorithm_active=True)
+
+
+def visualize_avg_log_likelihood(data, dataset_name,
+                                 max_components=8):
+
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    x = np.arange(1, max_components + 1)
+
+    fig.add_trace(go.Scatter(
+            x=x,
+            y=data["mean_scores"], error_y=dict(
+                type='data',  # value of error bar given in data coordinates
+                array=data["scores_stdev"],
+                visible=True), name='log density (left axis)'))
+
+    fig.add_trace(
+        go.Scatter(x=x, y=data["aics"], name="AIC (right axis)"),
+        secondary_y=True,
+    )
+
+    fig.add_trace(
+        go.Scatter(x=x, y=data["bics"], name="BIC (right axis)"),
+        secondary_y=True,
+    )
+
+    fig.update_layout(
+        autosize=False,
+        width=1300,
+        height=600,
+        title=f"{dataset_name}"
+    )
+
+    # Set x-axis title
+    fig.update_xaxes(title_text="Number of HMM components")
+
+    # Set y-axes titles
+    fig.update_yaxes(title_text="Average log density", secondary_y=False)
+    fig.update_yaxes(title_text="AIC/BIC", secondary_y=True)
+
+    fig.show()
