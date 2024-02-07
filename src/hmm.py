@@ -10,7 +10,7 @@ from tqdm import trange
 class HMM():
 
     def __init__(self, max_components, cov_type, n_seeds, n_iter):
-        self.max_componets = max_components
+        self.max_components = max_components
         self.cov_type = cov_type
         self.n_seeds = n_seeds
         self.n_iter = n_iter
@@ -96,7 +96,7 @@ class HMM():
         train_dfs, test_dfs, train_data, \
             test_data = self._prep_train_data(dfs, test_size, seed)
 
-        for i in trange(1, self.max_componets+1):
+        for i in trange(1, self.max_components+1):
 
             best_score, best_model, aics_buf, bics_buf, \
                 scores_buf = self._train(i, train_data, test_data, train_dfs,
