@@ -3,7 +3,7 @@ import os
 import evaluate
 import torch
 from accelerate import Accelerator
-from metrics import get_distribution_stats, get_matrix_metrics, get_tensor_metrics
+from src.metrics import get_distribution_stats, get_matrix_metrics, get_tensor_metrics
 
 
 class ModelManager:
@@ -12,10 +12,17 @@ class ModelManager:
         self.train_dataloader = train_dataloader
         self.test_dataloader = test_dataloader
         self.config = config
+        self.accelerator = None
 
-        self.accelerator = Accelerator(cpu=config.get("cpu", False))
-        self._setup_optimizer_and_criterion()
-        self._prepare_for_acceleration()
+        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.config.get("lr", 1e-3))
+        self.criterion = torch.nn.CrossEntropyLoss()
+
+        if config.get("use_accelerator", True):
+            self.accelerator = Accelerator(cpu=config.get("cpu", False))
+            self.model, self.optimizer, self.train_dataloader, self.test_dataloader = self.accelerator.prepare(
+                self.model, self.optimizer, self.train_dataloader, self.test_dataloader
+            )
+
         self._load_eval()
         self._set_miscs()
 
@@ -23,15 +30,6 @@ class ModelManager:
         self.metrics_cache = []
         self.weights_biases_cache = {}
         self.training_metrics = {"loss": [], "accuracy": []}
-
-    def _setup_optimizer_and_criterion(self):
-        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.config.get("lr", 1e-3))
-        self.criterion = torch.nn.CrossEntropyLoss()
-
-    def _prepare_for_acceleration(self):
-        self.model, self.optimizer, self.train_dataloader, self.test_dataloader = self.accelerator.prepare(
-            self.model, self.optimizer, self.train_dataloader, self.test_dataloader
-        )
 
     def _load_eval(self):
         self.train_accuracy = evaluate.load(
@@ -135,9 +133,13 @@ class ModelManager:
 
                     self.model.train()
 
-        self.accelerator.wait_for_everyone()
-        model_path = os.path.join(self.config["run_output_dir"], "model.pt")
-        self.accelerator.save(self.model.state_dict(), model_path)
+        if self.accelerator is not None:
+            self.accelerator.wait_for_everyone()
+            model_path = os.path.join(self.config["run_output_dir"], "model.pt")
+            self.accelerator.save(self.model.state_dict(), model_path)
+        else:
+            model_path = os.path.join(self.config["run_output_dir"], "model.pt")
+            torch.save(self.model.state_dict(), model_path)
 
     def _evaluate(self):
         self.model.eval()
