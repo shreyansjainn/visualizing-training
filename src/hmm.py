@@ -169,7 +169,8 @@ class HMM():
         log_frameprob = model._compute_log_likelihood(X)
         log_probij, fwdlattice = _hmmc.forward_log(
                     model.startprob_, model.transmat_, log_frameprob)
-        n_components = fwdlattice.shape[1]  # can be computed another way
+        # n_components = fwdlattice.shape[1]  # can be computed another way
+        n_components = model.transmat_.shape[0]
         covars = [np.linalg.inv(model.covars_[i]) for i in range(n_components)]
 
         for i in range(len(X)):
