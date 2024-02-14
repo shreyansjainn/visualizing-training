@@ -247,3 +247,47 @@ def get_stats_for_cnn(file_pths, has_loss=False):
             buf["eval_accuracy"].append(data["eval_accuracy"]["accuracy"])
 
     return buf
+
+
+def break_list_by_lengths(lst, lengths):
+    """
+    Break the list in chunks of specified length
+
+    Args:
+        lst (list): input list
+        lengths (int): lengh of one chunk
+
+    Returns:
+        result: list of chunks of specified length
+    """
+    result = []
+    start_index = 0
+
+    for length in lengths:
+        sublist = lst[start_index:start_index + length]
+        result.append(sublist)
+        start_index += length
+
+    return result
+
+
+def softmax_with_overflow(logits):
+
+    """
+    log-sum-exp. convert logits into probabilities using softmax
+
+    """
+    exp_logits = np.exp(logits - np.max(logits))
+    return exp_logits / exp_logits.sum()
+
+
+def find_i_followed_by_j(lst, i, j):
+    """
+    Find transition in the estimated hidden state
+
+    Returns:
+        indexes: indexes of predictions where i is followed by j
+    """
+    indexes = [index for index in range(len(lst) - 1) if lst[index] == i and
+               lst[index + 1] == j]
+    return indexes
