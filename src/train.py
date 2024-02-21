@@ -1,3 +1,4 @@
+import json
 import os
 
 import evaluate
@@ -56,7 +57,7 @@ class ModelManager:
             layer_name, layer_type = layer_info
 
             for name, module in self.model.named_modules():
-                if layer_name in name and isinstance(module, layer_type):
+                if layer_name == name and isinstance(module, layer_type):
                     hook_fn = self.make_hook_function(name)
                     self.hooks.append(module.register_forward_hook(hook_fn))
                     self.weights_biases_cache[name] = []
@@ -67,8 +68,8 @@ class ModelManager:
                 "epoch": self.epoch,
                 "steps": self.steps,
                 "layer_name": name,
-                "weights": module.weight.clone().detach().cpu().numpy(),
-                "biases": module.bias.clone().detach().cpu().numpy(),
+                "weights": module.weight.clone().detach().cpu().numpy() if module.weight is not None else None,
+                "biases": module.bias.clone().detach().cpu().numpy() if module.bias is not None else None,
             }
 
             # Check if we already have an entry for this step
@@ -116,7 +117,7 @@ class ModelManager:
 
                     print(
                         f"Epoch {epoch}, Step {self.steps}, Train Loss: {train_loss}, Eval Loss: {eval_loss}, "
-                        f"Train Accuracy: {train_accuracy_metric}, Eval Accuracy: {eval_accuracy}"
+                        f"Train Accuracy: {train_accuracy_metric.get('accuracy')}, Eval Accuracy: {eval_accuracy.get('accuracy')}"
                     )
 
                     self.training_metrics["loss"].append(
@@ -126,8 +127,8 @@ class ModelManager:
                         {
                             "epoch": epoch,
                             "steps": self.steps,
-                            "train_accuracy": train_accuracy_metric,
-                            "eval_accuracy": eval_accuracy,
+                            "train_accuracy": train_accuracy_metric.get("accuracy"),
+                            "eval_accuracy": eval_accuracy.get("accuracy"),
                         }
                     )
 
@@ -161,25 +162,89 @@ class ModelManager:
         return eval_loss, eval_accuracy
 
     def compute_metrics(self):
+        metrics_per_step = {}
+
+        aggregated_weights = {}
+        aggregated_biases = {}
+
         for layer_name, data_list in self.weights_biases_cache.items():
             for data in data_list:
-                metrics_data = {"epoch": data["epoch"], "steps": data["steps"], "layer_name": data["layer_name"]}
+                step = data["steps"]
+                epoch = data["epoch"]
+                key = (step, epoch)
 
+                if key not in metrics_per_step:
+                    train_data = next(
+                        (
+                            item
+                            for item in self.training_metrics["loss"]
+                            if item["steps"] == step and item["epoch"] == epoch
+                        ),
+                        None,
+                    )
+                    accuracy_data = next(
+                        (
+                            item
+                            for item in self.training_metrics["accuracy"]
+                            if item["steps"] == step and item["epoch"] == epoch
+                        ),
+                        None,
+                    )
+
+                    metrics_per_step[key] = {
+                        "step": step,
+                        "epoch": epoch,
+                        "w": [],
+                        "train_loss": train_data["train_loss"] if train_data else None,
+                        "eval_loss": train_data["eval_loss"] if train_data else None,
+                        "train_accuracy": accuracy_data["train_accuracy"] if accuracy_data else None,
+                        "eval_accuracy": accuracy_data["eval_accuracy"] if accuracy_data else None,
+                    }
+
+                    aggregated_weights[key] = []
+                    aggregated_biases[key] = []
+
+                # Layer-specific metrics calculation
                 if data["weights"] is not None:
                     weights = torch.from_numpy(data["weights"])
-                    # Assuming a 4D tensor for Conv2D layers
-                    if weights.dim() == 4:
-                        metrics_data.update(get_tensor_metrics(weights))
-                        metrics_data["weight_distribution"] = get_distribution_stats(weights)
-                    # Assuming a 2D tensor for Linear layers
-                    elif weights.dim() == 2:
-                        metrics_data.update(get_matrix_metrics(weights))
-                        metrics_data["weight_distribution"] = get_distribution_stats(weights)
-                    else:
-                        continue  # Skip if dimensions are not 4 or 2
+                    # Depending on tensor dimension, compute metrics
+                    if weights.dim() == 4:  # Conv2D layers
+                        metrics_data = get_tensor_metrics(weights)
+                    elif weights.dim() == 2:  # Linear layers
+                        metrics_data = get_matrix_metrics(weights)
+
+                    metrics_per_step[key]["w"].append(metrics_data)
+
+                    aggregated_weights[key].append(weights.view(-1))
 
                 if data["biases"] is not None:
                     biases = torch.from_numpy(data["biases"])
-                    metrics_data["bias_distribution"] = get_distribution_stats(biases)
+                    aggregated_biases[key].append(biases.view(-1))
 
-                self.metrics_cache.append(metrics_data)
+        # Aggregate statistics
+        for (step, epoch), _ in metrics_per_step.items():
+            key = (step, epoch)
+
+            if aggregated_weights[key]:
+                all_weights_combined = torch.cat(aggregated_weights[key])
+                w_all_stats = get_distribution_stats(all_weights_combined)
+            else:
+                w_all_stats = {}
+
+            if aggregated_biases[key]:
+                all_biases_combined = torch.cat(aggregated_biases[key])
+                b_all_stats = get_distribution_stats(all_biases_combined)
+            else:
+                b_all_stats = {}
+
+            metrics_per_step[key].update({"w_all": w_all_stats, "b_all": b_all_stats})
+
+        self.metrics_cache = list(metrics_per_step.values())
+
+    def save_metrics(self):
+        metrics_path = os.path.join(
+            self.config["run_output_dir"],
+            f'lr{self.config["lr"]}_{self.config["optim"]}_seed{self.config["seed"]}_scaling{self.config["init_scaling"]}.json',
+        )
+        with open(metrics_path, "w") as f:
+            json.dump(self.metrics_cache, f)
