@@ -5,7 +5,7 @@ from scipy.stats import zscore
 import numpy as np
 from hmmlearn import hmm
 from tqdm import trange
-from utils import characterize_all_transitions
+from src.utils import characterize_all_transitions
 
 
 class HMM():
@@ -25,6 +25,7 @@ class HMM():
             dfs = [
                 pd.read_csv(file)
                 .sort_values(sort_col)
+                # .sort_index()
                 .reset_index(drop=True)[cols]
                 .head(first_n)
                 for file in glob.glob(data_dir + "*")
@@ -122,7 +123,7 @@ class HMM():
             "best_models": best_models,
         }
 
-    def feature_importance(self, cols, data, best_predictions):
+    def feature_importance(self, cols, data, best_predictions, phases,lengths):
         """
         Return Feature Importance of all transitions for the best model
 
@@ -137,10 +138,8 @@ class HMM():
             difference due to them
         """
 
-        lengths = [len(df) for df in data]
-
         transitions = characterize_all_transitions(self.best_model, data,
                                                    best_predictions, cols,
-                                                   lengths)
+                                                   lengths, phases)
 
         return transitions

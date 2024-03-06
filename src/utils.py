@@ -42,6 +42,7 @@ def make_hmm_data(data_dir, cols, sort=True, first_n=1000):
             dfs = [
                 pd.read_csv(file)
                 .sort_values("epoch")
+                # .sort_index()
                 .reset_index(drop=True)[cols]  # restrict to cols of interest
                 .head(first_n)
                 for file in glob.glob(data_dir + "*")
@@ -308,7 +309,7 @@ def save_model(model_path, model):
         pickle.dump(model, f)
 
 
-def get_features_for_transition(self, model, data, best_predictions, lengths,
+def get_features_for_transition(model, data, best_predictions, lengths,
                                 phase_1, phase_2):
 
     '''
@@ -324,10 +325,11 @@ def get_features_for_transition(self, model, data, best_predictions, lengths,
 
     features = []
     for (i, datum) in enumerate(break_list_by_lengths(data, lengths)):
+
         preds = best_predictions[i]
         indexes = find_i_followed_by_j(preds, phase_1, phase_2)
         if indexes != []:
-            derivatives = np.array(self.get_derivatives(datum, model))
+            derivatives = np.array(get_derivatives(datum, model))
             for idx in indexes:
                 features.append(derivatives[idx, phase_2])
     return features
@@ -375,10 +377,10 @@ def get_derivatives(X, model):
     return derivatives
 
 
-def munge_data(self, model_pth, data_dir, cols, n_components, first_n=1000):
-
-    dfs = self._make_hmm_data(data_dir, cols, sort=True, sort_col="epoch",
-                              first_n=first_n)
+def munge_data(hmm_model, model_pth, data_dir, cols, n_components,
+               first_n=1000):
+    dfs = hmm_model._make_hmm_data(data_dir, cols, sort=True, sort_col="epoch",
+                                   first_n=first_n)
     data = np.vstack(
         [np.apply_along_axis(zscore, 0, df.to_numpy()) for df in dfs]
     )
@@ -405,27 +407,56 @@ def characterize_transition_between_phases(model, data, best_predictions, cols,
                                            lengths, i, j)
 
     print(f"Number of times transition happened: {len(features)}")
-    features = np.mean(features, axis=0)
+    if len(features) != 0:
+        features = np.mean(features, axis=0)
+
     order = np.argsort(np.abs(features))[::-1]
 
     feature_changes = np.array(get_difference_bt_means(model, i, j))
+    if len(order) != 0:
+        return np.array(cols)[order].tolist(), feature_changes[order].tolist()
+    else:
+        return [], []
 
-    return cols[order], feature_changes[order]
 
+def characterize_all_transitions(model, data, best_predictions, cols, lengths, phases):
 
-def characterize_all_transitions(model, data, best_predictions, cols, lengths):
-
-    phases = list(set(best_predictions))
+    # phases = list(set(best_predictions))
 
     transitions = {}
 
     for i in phases:
         for j in phases:
-            if i != j:
-                cols, feature_changes = characterize_transition_between_phases(
-                    model, data, best_predictions, cols, lengths, i, j)
-                transition_key = str(i) + '>>' + str(j)
-                transitions[transition_key]['cols'] = cols
-                transitions[transition_key]['feature_changes'] = feature_changes
+            # if i != j:
+            sorted_cols, feature_changes = characterize_transition_between_phases(
+                model, data, best_predictions, cols, lengths, i, j)
+
+            transition_key = str(i) + '>>' + str(j)
+            transitions[transition_key] = {}
+            transitions[transition_key]['cols'] = sorted_cols
+            transitions[transition_key]['feature_changes'] = feature_changes
 
     return transitions
+
+
+def training_run_json_to_csv(save_dir, is_transformer, has_loss, lr, optimizer,
+                             init_scaling, input_dir=None, n_seeds=40):
+
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    for seed in range(n_seeds):
+        # optimizer = "adamw"
+        # lr = 0.001
+        # init_scaling = 1.0
+        d = (
+            input_dir
+            + f"lr{lr}_{optimizer}_seed{seed}_scaling{init_scaling}/*.json"
+        )
+        pths = glob.glob(d)
+        vals = get_stats_for_run(pths, is_transformer, has_loss)
+        df = pd.DataFrame(vals)
+
+        file_name = f"lr{lr}_{optimizer}_seed{seed}_scaling{init_scaling}.csv"
+
+        df.to_csv(f"{save_dir}/{file_name}")
