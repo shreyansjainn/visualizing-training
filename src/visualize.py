@@ -25,7 +25,7 @@ def visualize_hmm_loss(data, phase_col: str, epoch_col: str, loss_col: str,
 
     """
 
-    fig = px.scatter(data, x=epoch_col, y=loss_col, 
+    fig = px.scatter(data, x=epoch_col, y=loss_col,
                      color=data[phase_col].tolist(), hover_data=hover_data)
 
     fig.add_trace(go.Scatter(mode='lines',
@@ -64,7 +64,7 @@ def visualize_dag(transmat, node_hover_dict: Dict = None,
                 if edge_hover_dict:
                     dot.add_edge(i, j, label=np.round(transmat[i][j], 3),
                                  label_size=10, length=10,
-                                 hover=edge_hover_dict[str(i)+">>"+str(j)])
+                                 hover=edge_hover_dict[str(i)+">>"+str(j)]['cols'])
                 else:
                     dot.add_edge(i, j, label=np.round(transmat[i][j], 3),
                                  label_size=10, length=10)
