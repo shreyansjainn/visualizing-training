@@ -456,6 +456,8 @@ def training_run_json_to_csv(save_dir, is_transformer, has_loss, lr, optimizer,
         pths = glob.glob(d)
         vals = get_stats_for_run(pths, is_transformer, has_loss)
         df = pd.DataFrame(vals)
+        df = df.reset_index()
+        df.rename(columns={"index": "epoch"}, inplace=True)
 
         file_name = f"lr{lr}_{optimizer}_seed{seed}_scaling{init_scaling}.csv"
 
