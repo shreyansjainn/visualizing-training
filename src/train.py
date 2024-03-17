@@ -40,18 +40,15 @@ class ModelManager:
                 self.model, self.optimizer, self.train_dataloader, self.test_dataloader
             )
 
-        self.model_path = self.config["run_output_dir"]
-        self.metrics_path = os.path.join(
+        self.save_path = os.path.join(
             self.config["run_output_dir"],
-            f'lr{self.config["lr"]}_{self.config["optimizer"]}_seed{self.config["seed"]}_scaling{self.config["init_scaling"]}',  
+            f'lr{self.config["lr"]}_{self.config["optimizer"]}_seed{self.config["seed"]}_scaling{self.config["init_scaling"]}',
         )
-        if not os.path.exists(self.model_path):
-            os.makedirs(self.model_path)
-        if not os.path.exists(self.metrics_path):
-            os.makedirs(self.metrics_path)
+        if not os.path.exists(self.save_path):
+            os.makedirs(self.save_path)
 
         self._load_eval()
-        
+
         if not config.get("is_transformer"):
             self._set_miscs()
 
@@ -115,6 +112,7 @@ class ModelManager:
 
     def train(self):
         self.steps = 0
+        torch.manual_seed(self.config["seed"])
         self.model.train()
 
         for epoch in range(self.config["num_epochs"]):
@@ -159,15 +157,15 @@ class ModelManager:
 
             print(
                 f"Epoch {epoch}, Train Loss: {train_loss}, Eval Loss: {eval_loss}, "
-                f"Train Accuracy: {train_accuracy_metric.get('accuracy')}, Eval Accuracy: {eval_accuracy.get('accuracy')}"  
+                f"Train Accuracy: {train_accuracy_metric.get('accuracy')}, Eval Accuracy: {eval_accuracy.get('accuracy')}"
             )
 
         if self.accelerator is not None:
             self.accelerator.wait_for_everyone()
-            model_path = os.path.join(self.model_path, "model.pt")
+            model_path = os.path.join(self.save_path, "model.pt")
             self.accelerator.save(self.model.state_dict(), model_path)
         else:
-            model_path = os.path.join(self.model_path, "model.pt")
+            model_path = os.path.join(self.save_path, "model.pt")
             torch.save(self.model.state_dict(), model_path)
 
     def _evaluate(self):
@@ -396,6 +394,18 @@ class ModelManager:
                     "eval_accuracy": highest_step_metric.get("eval_accuracy"),
                 }
 
-            metrics_filename = os.path.join(self.metrics_path, f"epoch{epoch}.json")
+            metrics_filename = os.path.join(self.save_path, f"epoch{epoch}.json")
             with open(metrics_filename, "w") as f:
                 json.dump(filtered_metrics, f, indent=4)
+
+    def train_and_save_metrics(self):
+        print(f"Training with seed {self.config['seed']}")
+        self.train()
+        print("Computing metrics")
+        self.compute_metrics()
+        print("Saving metrics")
+        self.save_metrics()
+        self.clear_weights_biases_cache()
+        self.clear_metrics_cache()
+        self.remove_hooks()
+        print(f"Finished training and saving metrics with seed {self.config['seed']}")
