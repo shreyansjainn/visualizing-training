@@ -424,9 +424,11 @@ def characterize_all_transitions(model, data, best_predictions, cols, lengths, p
     # phases = list(set(best_predictions))
 
     transitions = {}
+    
+    n_phases = model.transmat_.shape[0]
 
-    for i in phases:
-        for j in phases:
+    for i in range(n_phases):
+        for j in range(n_phases):
             # if i != j:
             sorted_cols, feature_changes = characterize_transition_between_phases(
                 model, data, best_predictions, cols, lengths, i, j)
@@ -450,7 +452,7 @@ def training_run_json_to_csv(save_dir, is_transformer, has_loss, lr, optimizer,
         # lr = 0.001
         # init_scaling = 1.0
         d = (
-            input_dir
+            input_dir + "/"
             + f"lr{lr}_{optimizer}_seed{seed}_scaling{init_scaling}/*.json"
         )
         pths = glob.glob(d)
