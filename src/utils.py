@@ -406,7 +406,6 @@ def characterize_transition_between_phases(model, data, best_predictions, cols,
     features = get_features_for_transition(model, data, best_predictions,
                                            lengths, i, j)
 
-    print(f"Number of times transition happened: {len(features)}")
     if len(features) != 0:
         features = np.mean(features, axis=0)
 
