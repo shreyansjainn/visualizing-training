@@ -1,5 +1,5 @@
-## hmm
-`class HMM(max_components: int, cov_type: str, n_seeds: int, n_iter: int)`
+## HMM
+`class src.hmm.HMM(max_components: int, cov_type: str, n_seeds: int, n_iter: int)`
       
      PARAMETERS
      * `max_components`: The maximum number of components to consider for the HMM.
@@ -20,6 +20,22 @@
     * `test_size`: The size of the test data for the HMM training.
     * `seed`: The random seed to use for the HMM training.
   
+Example:
+
+```python
+from src.hmm import HMM
+
+max_components = 8
+cov_type = "diag"
+n_seeds = 4 
+n_iter = 10
+cols = ['col1', 'col2', 'col3']
+first_n = 100
+hmm_model = HMM(max_components, cov_type, n_seeds, n_iter)
+data_dir = 'data_dir/'
+
+hmm_output = hmm_model.get_avg_log_likelihood(data_dir, cols)
+```
 * `feature_importance(cols: List[str], data: List[pd.DataFrame], best_predictions: List[np.ndarray], phases: List[str], lengths: List[int])`
   
     Computes the feature importance for the HMM model.
@@ -30,3 +46,17 @@
     * `best_predictions`: The best predictions from the HMM model.
     * `phases`: The phases of the HMM model.
     * `lengths`: The lengths of the data.
+
+Example:
+```python
+from src.utils import munge_data
+
+n_components = 8
+model_path = 'model_path.pkl'
+
+model, data, best_predictions, lengths = munge_data(hmm_model, model_path, data_dir, cols, n_components)
+
+phases = list(set(hmm_model.best_model.predict(data, lengths=lengths)))
+
+state_transitions = hmm_model.feature_importance(cols, data, best_predictions,phases,lengths)
+```
