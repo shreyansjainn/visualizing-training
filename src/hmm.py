@@ -19,7 +19,7 @@ class HMM():
     def _make_hmm_data(self, data_dir, cols, sort, sort_col, first_n):
 
         print(data_dir)
-        print(glob.glob(data_dir + "*"))
+        print(glob.glob(data_dir + "*.csv"))
         if sort:
             # restrict to cols of interest
             dfs = [
@@ -28,13 +28,13 @@ class HMM():
                 # .sort_index()
                 .reset_index(drop=True)[cols]
                 .head(first_n)
-                for file in glob.glob(data_dir + "*")
+                for file in glob.glob(data_dir + "*.csv")
             ]
         else:
             # restrict to cols of interest
             dfs = [
                 pd.read_csv(file)[cols].head(first_n)
-                for file in glob.glob(data_dir + "*")
+                for file in glob.glob(data_dir + "*.csv")
             ]
         # remove invalid dfs
         dfs = [df for df in dfs if not df.isnull().values.any()]
