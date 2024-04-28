@@ -11,9 +11,9 @@ import os
 import json
 import argparse
 
-from src.data import ModularArithmetic
-from src.model import Transformer, custom_weight_init
-from src.metrics import get_metrics_transformer
+from visualize_training.data import ModularArithmetic
+from visualize_training.model import Transformer, custom_weight_init
+from visualize_training.metrics import get_metrics_transformer
 
 # %%
 # replicating https://arxiv.org/pdf/2301.05217.pdf

@@ -5,7 +5,7 @@ from scipy.stats import zscore
 import numpy as np
 from hmmlearn import hmm
 from tqdm import trange
-from src.utils import characterize_all_transitions
+from visualize_training.utils import characterize_all_transitions
 
 
 class HMM():

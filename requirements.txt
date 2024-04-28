@@ -1,12 +1,12 @@
 numpy==1.26.4
 pandas==2.2.1
 evaluate==0.4.1
-torch==2.2.2 
-accelerate==0.28.0 
+torch==2.2.2
+accelerate==0.28.0
 wandb==0.16.5
 einops==0.7.0
-torchvision==0.17.2 
+torchvision==0.17.2
 hmmlearn==0.3.2
 graphviz==0.20.3
-plotly==5.20.0 
-gravis==0.1.0 
+plotly==5.20.0
+gravis==0.1.0

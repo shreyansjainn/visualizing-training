@@ -4,7 +4,7 @@ import os
 import evaluate
 import torch
 from accelerate import Accelerator
-from src.metrics import get_distribution_stats, get_matrix_metrics, get_tensor_metrics
+from visualize_training.metrics import get_distribution_stats, get_matrix_metrics, get_tensor_metrics
 
 
 class ModelManager:
