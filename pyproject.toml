@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 name = "visualizing-training"
 version = "1.0.0"
 description = "Modelling Training Dynamics and Interpreting the dynamics"
-
+readme = "README.md"
 dependencies = [
     "numpy>=1.25.2",
     "pandas>=2.2.1",
