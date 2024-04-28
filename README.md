@@ -142,7 +142,7 @@ Calculating feature importance to shortlist top n most important features contri
 from src.utils import munge_data
 
 n_components = 8 # best model chosen from the visualization
-model_path = 'model_path'
+model_path = 'model_path.pkl'
 
 model, data, best_predictions, lengths = munge_data(hmm_model, model_path, data_dir, cols, n_components)
 
