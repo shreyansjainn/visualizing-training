@@ -1,0 +1,6 @@
+# MANIFEST.in
+
+include visualize_training/*.py
+include *.txt
+include *.toml
+include *.py

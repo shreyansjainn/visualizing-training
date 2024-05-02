@@ -8,7 +8,7 @@ import numpy as np
 
 from torch_cka import CKA
 
-from src.model import MLP
+from visualize_training.model import MLP
 from tqdm import tqdm
 
 import argparse

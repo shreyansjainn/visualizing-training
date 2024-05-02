@@ -6,7 +6,7 @@ import networkx as nx
 import gravis as gv
 import numpy as np
 from typing import Dict, List
-from src.constants import HEX_VALUES
+from visualize_training.constants import HEX_VALUES
 
 
 def visualize_hmm_loss(data, phase_col: str, epoch_col: str, loss_col: str,
