@@ -441,12 +441,13 @@ def characterize_all_transitions(model, data, best_predictions, cols, lengths, p
 
 
 def training_run_json_to_csv(save_dir, is_transformer, has_loss, lr, optimizer,
-                             init_scaling, input_dir=None, n_seeds=40):
+                             init_scaling, input_dir=None, n_seeds=40, seeds=None):
 
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    for seed in range(n_seeds):
+    seeds = seeds if seeds else list(range(n_seeds))
+    for seed in seeds:
         # optimizer = "adamw"
         # lr = 0.001
         # init_scaling = 1.0
