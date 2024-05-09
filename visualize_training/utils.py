@@ -190,6 +190,10 @@ def get_stats_for_run(file_pths, is_transformer, has_loss=False):
 
         buf["step"].append(step)
 
+        buf["grad_sym"].append(data["grad_sym"])
+        buf["train_dist_irr"].append(data["train_dist_irr"])
+        buf["test_dist_irr"].append(data["test_dist_irr"])
+
         if has_loss:
             buf["train_loss"].append(data["train_loss"])
             buf["eval_loss"].append(data["eval_loss"])
