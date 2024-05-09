@@ -4,7 +4,7 @@ import os
 import evaluate
 import torch
 from accelerate import Accelerator
-from visualize_training.metrics import get_distribution_stats, get_matrix_metrics, get_tensor_metrics
+from visualize_training.metrics import get_distribution_stats, get_matrix_metrics, get_tensor_metrics, gradient_symmetricity, distance_irrelevance
 
 
 class ModelManager:
@@ -55,7 +55,7 @@ class ModelManager:
         self.hooks = []
         self.metrics_cache = []
         self.weights_biases_cache = {}
-        self.training_metrics = {"loss": [], "accuracy": []}
+        self.training_metrics = {"loss": [], "accuracy": [], "grad_sym": [], "dist_irr": []}
 
     def _load_eval(self):
         self.train_accuracy = evaluate.load(
@@ -140,7 +140,29 @@ class ModelManager:
                 if self.epoch % self.config["eval_every"] == 0:
                     eval_loss, eval_accuracy = self._evaluate()
                     train_accuracy_metric = self.train_accuracy.compute()
-
+                    
+                    # calculation for gradient symmetricity
+                    mod_no = (x[0][-1]).item()
+                    grad_sym = gradient_symmetricity(model=self.model, mod_no=mod_no)
+                    
+                    self.training_metrics['grad_sym'].append(
+                        {"epoch": epoch, "steps": self.steps, "grad_sym": grad_sym}
+                    )
+                    
+                    train_dist_irr = distance_irrelevance(model=self.model,
+                                                          dataloader=self.train_dataloader,
+                                                          mod_no=mod_no)
+                    
+                    test_dist_irr = distance_irrelevance(model=self.model,
+                                                         dataloader=self.test_dataloader,
+                                                         mod_no=mod_no)
+                    
+                    self.training_metrics['dist_irr'].append(
+                        {"epoch": epoch, "steps": self.steps,
+                         "train_dist_irr": train_dist_irr,
+                         "test_dist_irr": test_dist_irr}
+                    )
+                    
                     self.training_metrics["loss"].append(
                         {"epoch": epoch, "steps": self.steps, "train_loss": train_loss, "eval_loss": eval_loss}
                     )
@@ -220,6 +242,24 @@ class ModelManager:
                     ),
                     None,
                 )
+                
+                grad_sym_data = next(
+                    (
+                        item
+                        for item in self.training_metrics["grad_sym"]
+                        if item["steps"] == step and item["epoch"] == epoch
+                    ),
+                    None,
+                )
+                
+                dist_irr_data = next(
+                    (
+                        item
+                        for item in self.training_metrics["dist_irr"]
+                        if item["steps"] == step and item["epoch"] == epoch
+                    ),
+                    None,
+                )
 
                 if self.config.get("is_transformer"):
                     if key not in metrics_per_step:
@@ -236,6 +276,9 @@ class ModelManager:
                             "eval_loss": train_data["eval_loss"] if train_data else None,
                             "train_accuracy": accuracy_data["train_accuracy"] if accuracy_data else None,
                             "eval_accuracy": accuracy_data["eval_accuracy"] if accuracy_data else None,
+                            "grad_sym": grad_sym_data['grad_sym'] if grad_sym_data else None,
+                            "train_dist_irr": dist_irr_data['train_dist_irr'] if dist_irr_data else None,
+                            "test_dist_irr": dist_irr_data['test_dist_irr'] if dist_irr_data else None
                         }
 
                         aggregated_weights[key] = []
@@ -382,6 +425,9 @@ class ModelManager:
                     "eval_loss": highest_step_metric.get("eval_loss"),
                     "train_accuracy": highest_step_metric.get("train_accuracy"),
                     "eval_accuracy": highest_step_metric.get("eval_accuracy"),
+                    "grad_sym": highest_step_metric.get("grad_sym"),
+                    "train_dist_irr": highest_step_metric.get("train_dist_irr"),
+                    "test_dist_irr": highest_step_metric.get("test_dist_irr")
                 }
             else:
                 filtered_metrics = {
