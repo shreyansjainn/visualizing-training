@@ -190,11 +190,15 @@ def get_stats_for_run(file_pths, is_transformer, has_loss=False):
 
         buf["step"].append(step)
 
+        buf["grad_sym"].append(data["grad_sym"])
+        buf["train_dist_irr"].append(data["train_dist_irr"])
+        buf["test_dist_irr"].append(data["test_dist_irr"])
+
         if has_loss:
             buf["train_loss"].append(data["train_loss"])
             buf["eval_loss"].append(data["eval_loss"])
-            buf["train_accuracy"].append(data["train_accuracy"]["accuracy"])
-            buf["eval_accuracy"].append(data["eval_accuracy"]["accuracy"])
+            buf["train_accuracy"].append(data["train_accuracy"])
+            buf["eval_accuracy"].append(data["eval_accuracy"])
 
     return buf
 
@@ -441,13 +445,12 @@ def characterize_all_transitions(model, data, best_predictions, cols, lengths, p
 
 
 def training_run_json_to_csv(save_dir, is_transformer, has_loss, lr, optimizer,
-                             init_scaling, input_dir=None, n_seeds=40, seeds=None):
+                             init_scaling, input_dir=None, n_seeds=40):
 
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    seeds = seeds if seeds else list(range(n_seeds))
-    for seed in seeds:
+    for seed in range(n_seeds):
         # optimizer = "adamw"
         # lr = 0.001
         # init_scaling = 1.0

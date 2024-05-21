@@ -4,6 +4,7 @@ from torch import nn
 import itertools
 
 import numpy as np
+import random
 
 # Hooks and metrics
 # TODO: make this generic
@@ -155,8 +156,8 @@ def get_matrix_metrics(X):
         "l2": l2,
         "trace": trace,
         "spectral": spectral,
-        "code_sparsity": l1 / l2,
-        "computational_sparsity": trace / spectral,
+        "code_sparsity": l1 / l2 if l2 > 0 else 0.0,
+        "computational_sparsity": trace / spectral if spectral > 0 else 0.0,
         "mean_singular_value": mean,
         "var_singular_value": var,
         "singular_values": singular_vals.tolist(),
@@ -375,3 +376,49 @@ def get_lm_loss_hf_transformer(model, train_dataloader, device):
     data_dict["train_loss"] = np.mean(train_loss)
 
     return data_dict
+
+
+def gradient_symmetricity(model, mod_no: int, n_sample: int = 100,
+                          device: str = 'cpu'):
+
+    sample_data = [(a, b, c) for a in range(mod_no) for b in range(mod_no) for c in range(mod_no)]
+    random.shuffle(sample_data)
+    sample_data = sample_data[:n_sample]
+
+    total = 0
+    for a, b, c in sample_data:
+        x = torch.tensor([[a, b]], device=device)
+        temp, output = model.forward_h(x)
+        model.zero_grad()
+        model.remove_all_hooks()
+        o = output[0, -1, :]
+        temp.retain_grad()
+        o[c].backward(retain_graph=True)
+        gradient = temp.grad[0].detach().cpu().numpy()
+
+        cos_sim = np.sum(gradient[0]*gradient[1])/np.sqrt(np.sum(gradient[0]**2))/np.sqrt(np.sum(gradient[1]**2))
+        total += cos_sim
+
+    return total / len(sample_data)
+
+
+def distance_irrelevance(model, dataloader, mod_no: int):
+    correct_logits = [[0]*mod_no for _ in range(mod_no)]
+    for x, y in dataloader:
+        with torch.inference_mode():
+            model.eval()
+            model.remove_all_hooks()
+            output = model(x)[:, -1, :]
+
+            # selecting diagonal elements of the tensor to get correct logits
+            diag_output = output[list(range(len(x))), y]
+            diag_output = diag_output.cpu()
+            x = x.cpu()
+            for p, q in zip(diag_output, x):
+                A, B = int(q[0].item()), int(q[1].item())
+                correct_logits[(A+B) % mod_no][(A-B) % mod_no] = p.item()
+
+    correct_logits = np.array(correct_logits)
+    distance_irrelevance = np.mean(np.std(correct_logits, axis=0)
+                                   )/np.std(correct_logits.flatten())
+    return distance_irrelevance
