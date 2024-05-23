@@ -8,10 +8,11 @@ from visualize_training.metrics import get_distribution_stats, get_matrix_metric
 
 
 class ModelManager:
-    def __init__(self, model, train_dataloader, test_dataloader, config):
+    def __init__(self, model, train_dataloader, test_dataloader, full_dataloader, config):
         self.model = model
         self.train_dataloader = train_dataloader
         self.test_dataloader = test_dataloader
+        self.full_dataloader = full_dataloader
         self.config = config
         self.accelerator = None
 
@@ -19,7 +20,7 @@ class ModelManager:
             self.optimizer = torch.optim.AdamW(
                 self.model.parameters(), lr=self.config.get("lr", 1e-3), weight_decay=self.config.get("weight_decay"), betas=(0.9,0.98)
             )
-            self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda step: min(step/10, 1))
+            #self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda step: min(step/10, 1))
         elif self.config.get("optimizer") == "sgd":
             self.optimizer = torch.optim.SGD(
                 self.model.parameters(), lr=self.config.get("lr", 1e-3), weight_decay=self.config.get("weight_decay")
@@ -128,9 +129,9 @@ class ModelManager:
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.config["lr"] * 10)
 
                 
-                loss.backward() if self.accelerator is None else self.accelerator.backward(loss)
+                loss.backward()
                 self.optimizer.step()
-                self.scheduler.step()
+                #self.scheduler.step()
                 self.optimizer.zero_grad()
                
 
@@ -146,21 +147,21 @@ class ModelManager:
                     train_accuracy_metric = self.train_accuracy.compute()
                     
                     # calculation for gradient symmetricity
-                    mod_no = (x[0][-1]).item()
+                    mod_no = self.config['C']
                     grad_sym = gradient_symmetricity(model=self.model, mod_no=mod_no)
                     
                     self.training_metrics['grad_sym'].append(
                         {"epoch": epoch, "steps": self.steps, "grad_sym": grad_sym}
                     )
                     
-                    train_dist_irr = 0
-                    
-                    test_dist_irr = 0
+                    dist_irr = distance_irrelevance(model=self.model,
+                                                          dataloader=self.full_dataloader,
+                                                          mod_no=mod_no)
                     
                     self.training_metrics['dist_irr'].append(
                         {"epoch": epoch, "steps": self.steps,
-                         "train_dist_irr": train_dist_irr,
-                         "test_dist_irr": test_dist_irr}
+                         "dist_irr": dist_irr,
+                        }
                     )
                     
                     self.training_metrics["loss"].append(
@@ -277,8 +278,7 @@ class ModelManager:
                             "train_accuracy": accuracy_data["train_accuracy"] if accuracy_data else None,
                             "eval_accuracy": accuracy_data["eval_accuracy"] if accuracy_data else None,
                             "grad_sym": grad_sym_data['grad_sym'] if grad_sym_data else None,
-                            "train_dist_irr": dist_irr_data['train_dist_irr'] if dist_irr_data else None,
-                            "test_dist_irr": dist_irr_data['test_dist_irr'] if dist_irr_data else None
+                            "dist_irr": dist_irr_data['dist_irr'] if dist_irr_data else None,
                         }
 
                         aggregated_weights[key] = []
@@ -426,8 +426,7 @@ class ModelManager:
                     "train_accuracy": highest_step_metric.get("train_accuracy"),
                     "eval_accuracy": highest_step_metric.get("eval_accuracy"),
                     "grad_sym": highest_step_metric.get("grad_sym"),
-                    "train_dist_irr": highest_step_metric.get("train_dist_irr"),
-                    "test_dist_irr": highest_step_metric.get("test_dist_irr")
+                    "dist_irr": highest_step_metric.get("dist_irr"),
                 }
             else:
                 filtered_metrics = {

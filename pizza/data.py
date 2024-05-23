@@ -2,10 +2,9 @@ import torch
 import numpy as np
 from torch.utils.data import DataLoader
 
-DEVICE='cuda' if torch.cuda.is_available() else 'cpu'
 
 class MyAddDataSet(torch.utils.data.Dataset):
-    def __init__(self, func, C, diff_vocab=False, eqn_sign=False):
+    def __init__(self, func, C, diff_vocab=False, eqn_sign=False, device='cpu'):
         self.func = func
         dim = 2
         self.dim = dim
@@ -13,6 +12,7 @@ class MyAddDataSet(torch.utils.data.Dataset):
         self.inputs = []
         self.outputs = []
         self.vocab=C
+        self.device=device
         if diff_vocab:
             self.vocab*=2
         if eqn_sign:
@@ -32,8 +32,8 @@ class MyAddDataSet(torch.utils.data.Dataset):
             self.vocab_out=max(self.vocab_out, o+1)
         if self.vocab_out!=C:
             print(f'warning {self.vocab_out=} neq to {C=}')
-        self.inputs = torch.tensor(self.inputs, dtype=torch.long, device=DEVICE)
-        self.outputs = torch.tensor(self.outputs, dtype=torch.long, device=DEVICE)
+        self.inputs = torch.tensor(self.inputs, dtype=torch.long, device=self.device)
+        self.outputs = torch.tensor(self.outputs, dtype=torch.long, device=self.device)
         print(self.inputs,self.outputs)
     def __len__(self):
         return len(self.outputs)
@@ -42,9 +42,10 @@ class MyAddDataSet(torch.utils.data.Dataset):
 
 
 def get_dataloaders(config):
+    device = 'cpu' if config.get('cpu') else 'cuda'
     config['func']=eval(config['funcs'])
     useLinear=config.get('use_linear',False)
-    full_dataset = MyAddDataSet(func=config['func'],C=config['C'],diff_vocab=config['diff_vocab'],eqn_sign=config['eqn_sign'])
+    full_dataset = MyAddDataSet(func=config['func'],C=config['C'],diff_vocab=config['diff_vocab'],eqn_sign=config['eqn_sign'],device=device)
     train_size = int(config['frac'] * len(full_dataset))
     test_size = len(full_dataset) - train_size
     train_dataset, test_dataset = torch.utils.data.random_split(full_dataset, [train_size, test_size])
@@ -53,3 +54,10 @@ def get_dataloaders(config):
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     return train_loader, test_loader
+
+def get_dataloaders_with_full_dataset(config):
+    config['func']=eval(config['funcs'])
+    useLinear=config.get('use_linear',False)
+    full_dataset = MyAddDataSet(func=config['func'],C=config['C'],diff_vocab=config['diff_vocab'],eqn_sign=config['eqn_sign'])
+    data_loader = torch.utils.data.DataLoader(full_dataset, batch_size=config['C']*config['C'])
+    return data_loader
