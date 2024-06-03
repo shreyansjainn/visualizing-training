@@ -149,13 +149,27 @@ class ModelManager:
                     if self.config.get("clock_pizza_metrics"):
                         # calculation for gradient symmetricity
                         mod_no = self.config['C']
-                        grad_sym = gradient_symmetricity(model=self.model, mod_no=mod_no)
+
+                        # Clone the current model
+                        model_clone = self.model.__class__(num_layers=self.config.get('n_layers',1),
+                                        num_heads=self.config['n_heads'],
+                                        d_model=self.config['d_model'],
+                                        d_head=self.config.get('d_head',self.config['d_model']//self.config['n_heads']),
+                                        attn_coeff=self.config['attn_coeff'],
+                                        d_vocab=self.config['C'],
+                                        act_type=self.config.get('act_fn','relu'),
+                                        n_ctx=self.config['n_ctx'],
+                                        use_ln=self.config['use_ln'])
+                        model_clone.load_state_dict(self.model.state_dict())  
+                    
+
+                        grad_sym = gradient_symmetricity(model=model_clone, mod_no=mod_no)
                         
                         self.training_metrics['grad_sym'].append(
                             {"epoch": epoch, "steps": self.steps, "grad_sym": grad_sym}
                         )
                         
-                        dist_irr = distance_irrelevance(model=self.model,
+                        dist_irr = distance_irrelevance(model=model_clone,
                                                             dataloader=self.full_dataloader,
                                                             mod_no=mod_no)
                         

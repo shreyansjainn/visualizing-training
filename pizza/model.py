@@ -164,7 +164,6 @@ class Transformer(nn.Module):
     def __init__(self, num_layers, d_vocab, d_model, d_head, num_heads, n_ctx, act_type, attn_coeff, use_cache=False, use_ln=True):
         super().__init__()
         assert 0<=attn_coeff<=1
-        print('parameters', num_layers, d_vocab, d_model, d_head, num_heads, n_ctx, act_type, attn_coeff, use_cache, use_ln)
         self.cache = {}
         self.use_cache = use_cache
 
