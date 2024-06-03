@@ -436,6 +436,14 @@ class Transformer(nn.Module):
             x = block(x)
         x = self.unembed(x)
         return x
+    
+    def forward_h(self, x):
+        x = self.embed(x)
+        tmp = x
+        x = self.pos_embed(x)
+        for blk in self.blocks:
+            x = blk(x)
+        return tmp, x
 
     def hook_points(self):
         return [module for name, module in self.named_modules() if "hook" in name]

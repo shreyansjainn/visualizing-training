@@ -89,7 +89,7 @@ def unpack_vals(
 
 
 # TODO: delete this function, fold into cnn method
-def get_stats_for_run(file_pths, is_transformer, has_loss=False):
+def get_stats_for_run(file_pths, is_transformer, has_loss=False, clock_pizza_metrics=False):
     buf = defaultdict(list)
 
     for file_pth in file_pths:
@@ -190,8 +190,10 @@ def get_stats_for_run(file_pths, is_transformer, has_loss=False):
 
         buf["step"].append(step)
 
-        buf["grad_sym"].append(data["grad_sym"])
-        buf["dist_irr"].append(data["dist_irr"])
+
+        if clock_pizza_metrics:
+            buf["grad_sym"].append(data["grad_sym"])
+            buf["dist_irr"].append(data["dist_irr"])
 
         if has_loss:
             buf["train_loss"].append(data["train_loss"])
@@ -444,7 +446,7 @@ def characterize_all_transitions(model, data, best_predictions, cols, lengths, p
 
 
 def training_run_json_to_csv(save_dir, is_transformer, has_loss, lr, optimizer,
-                             init_scaling, input_dir=None, n_seeds=40):
+                             init_scaling, input_dir=None, n_seeds=40, clock_pizza_metrics=False):
 
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -458,7 +460,7 @@ def training_run_json_to_csv(save_dir, is_transformer, has_loss, lr, optimizer,
             + f"lr{lr}_{optimizer}_seed{seed}_scaling{init_scaling}/*.json"
         )
         pths = glob.glob(d)
-        vals = get_stats_for_run(pths, is_transformer, has_loss)
+        vals = get_stats_for_run(pths, is_transformer, has_loss, clock_pizza_metrics)
         df = pd.DataFrame(vals)
         df = df.reset_index()
         df.rename(columns={"index": "epoch"}, inplace=True)
