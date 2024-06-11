@@ -123,7 +123,7 @@ class HMM():
             "best_models": best_models,
         }
 
-    def feature_importance(self, cols, data, best_predictions, phases,lengths):
+    def feature_importance(self, cols, data, best_predictions, phases,lengths,top_n=3):
         """
         Return Feature Importance of all transitions for the best model
 
@@ -140,6 +140,6 @@ class HMM():
 
         transitions = characterize_all_transitions(self.best_model, data,
                                                    best_predictions, cols,
-                                                   lengths, phases)
+                                                   lengths, phases,top_n)
 
         return transitions

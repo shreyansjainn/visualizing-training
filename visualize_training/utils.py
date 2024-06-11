@@ -422,7 +422,7 @@ def characterize_transition_between_phases(model, data, best_predictions, cols,
         return [], []
 
 
-def characterize_all_transitions(model, data, best_predictions, cols, lengths, phases):
+def characterize_all_transitions(model, data, best_predictions, cols, lengths, phases, top_n):
 
     # phases = list(set(best_predictions))
 
@@ -438,7 +438,7 @@ def characterize_all_transitions(model, data, best_predictions, cols, lengths, p
 
             transition_key = str(i) + '>>' + str(j)
             transitions[transition_key] = {}
-            transitions[transition_key]['cols'] = sorted_cols
+            transitions[transition_key]['cols'] = sorted_cols[:top_n]
             transitions[transition_key]['feature_changes'] = feature_changes
 
     return transitions
