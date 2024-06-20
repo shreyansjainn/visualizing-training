@@ -62,9 +62,10 @@ def visualize_dag(transmat, node_hover_dict: Dict = None,
                     dot.add_node(i, label=str(i+1), color=hex[i % len(hex)],
                                  size=10)
                 if edge_hover_dict:
-                    dot.add_edge(i, j, label=np.round(transmat[i][j], 3),
-                                 label_size=10, length=10,
-                                 hover=edge_hover_dict[str(i)+">>"+str(j)]['cols'])
+                    if edge_hover_dict[str(i)+">>"+str(j)]['feature_changes'] != []:
+                        dot.add_edge(i, j, label=np.round(transmat[i][j], 3),
+                                     label_size=10, length=10,
+                                     hover=edge_hover_dict[str(i)+">>"+str(j)]['cols'])
                 else:
                     dot.add_edge(i, j, label=np.round(transmat[i][j], 3),
                                  label_size=10, length=10)

@@ -55,13 +55,13 @@ class HMM():
 
         return train_dfs, test_dfs, train_data, test_data
 
-    def _train(self, n_components, train_data, test_data, train_dfs, test_dfs):
+    def _train(self, n_components, train_data, test_data, train_dfs, test_dfs, best_score, best_model):
 
         scores_buf = []
         aics_buf = []
         bics_buf = []
-        best_score = -np.inf
-        best_model = None
+        # best_score = -np.inf
+        # best_model = None
 
         train_lengths = [len(df) for df in train_dfs]
         test_lengths = [len(df) for df in test_dfs]
@@ -77,6 +77,9 @@ class HMM():
             bics_buf.append(model.bic(test_data, lengths=test_lengths))
             scores_buf.append(score)
             if score > best_score:
+                # print("score: ",score)
+                # print("best_score: ",best_score)
+                # print("best_model: ",model)
                 best_score = score
                 best_model = model
 
@@ -88,7 +91,8 @@ class HMM():
     def get_avg_log_likelihood(self, data_dir, cols, sort=True,
                                sort_col="epoch", first_n=None, test_size=0.2,
                                seed=0):
-
+        best_score = -np.inf
+        best_model = None
         best_scores = []
         mean_scores = []
         scores_stdev = []
@@ -105,7 +109,7 @@ class HMM():
 
             best_score, best_model, aics_buf, bics_buf, \
                 scores_buf = self._train(i, train_data, test_data, train_dfs,
-                                         test_dfs)
+                                         test_dfs, best_score, best_model)
 
             best_scores.append(best_score)
             mean_scores.append(np.mean(scores_buf))
@@ -121,6 +125,7 @@ class HMM():
             "aics": aics,
             "bics": bics,
             "best_models": best_models,
+            "best_model": self.best_model
         }
 
     def feature_importance(self, cols, data, best_predictions, phases,lengths,top_n=3):
