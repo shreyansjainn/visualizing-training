@@ -439,7 +439,7 @@ def characterize_all_transitions(model, data, best_predictions, cols, lengths, p
             transition_key = str(i) + '>>' + str(j)
             transitions[transition_key] = {}
             transitions[transition_key]['cols'] = sorted_cols[:top_n]
-            transitions[transition_key]['feature_changes'] = feature_changes
+            transitions[transition_key]['feature_changes'] = feature_changes[:top_n]
 
     return transitions
 
