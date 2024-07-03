@@ -417,9 +417,9 @@ def characterize_transition_between_phases(model, data, best_predictions, cols,
 
     feature_changes = np.array(get_difference_bt_means(model, i, j))
     if len(order) != 0:
-        return np.array(cols)[order].tolist(), feature_changes[order].tolist()
+        return np.array(cols)[order].tolist(), feature_changes[order].tolist(), features[order].tolist()
     else:
-        return [], []
+        return [], [], []
 
 
 def characterize_all_transitions(model, data, best_predictions, cols, lengths, phases, top_n):
@@ -433,13 +433,14 @@ def characterize_all_transitions(model, data, best_predictions, cols, lengths, p
     for i in range(n_phases):
         for j in range(n_phases):
             # if i != j:
-            sorted_cols, feature_changes = characterize_transition_between_phases(
+            sorted_cols, feature_changes, par_derivatives = characterize_transition_between_phases(
                 model, data, best_predictions, cols, lengths, i, j)
 
             transition_key = str(i) + '>>' + str(j)
             transitions[transition_key] = {}
             transitions[transition_key]['cols'] = sorted_cols[:top_n]
             transitions[transition_key]['feature_changes'] = feature_changes[:top_n]
+            transitions[transition_key]['par_derivatives'] = par_derivatives[:top_n]
 
     return transitions
 
