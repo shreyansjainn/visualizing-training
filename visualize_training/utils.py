@@ -89,7 +89,7 @@ def unpack_vals(
 
 
 # TODO: delete this function, fold into cnn method
-def get_stats_for_run(file_pths, is_transformer, has_loss=False):
+def get_stats_for_run(file_pths, is_transformer, has_loss=False, clock_pizza_metrics=False, random_features=False):
     buf = defaultdict(list)
 
     for file_pth in file_pths:
@@ -190,15 +190,22 @@ def get_stats_for_run(file_pths, is_transformer, has_loss=False):
 
         buf["step"].append(step)
 
-        buf["grad_sym"].append(data["grad_sym"])
-        buf["train_dist_irr"].append(data["train_dist_irr"])
-        buf["test_dist_irr"].append(data["test_dist_irr"])
+
+        if clock_pizza_metrics:
+            buf["grad_sym"].append(data["grad_sym"])
+            buf["dist_irr"].append(data["dist_irr"])
+
 
         if has_loss:
             buf["train_loss"].append(data["train_loss"])
             buf["eval_loss"].append(data["eval_loss"])
-            buf["train_accuracy"].append(data["train_accuracy"]["accuracy"])
-            buf["eval_accuracy"].append(data["eval_accuracy"]["accuracy"])
+            buf["train_accuracy"].append(data["train_accuracy"])
+            buf["eval_accuracy"].append(data["eval_accuracy"])
+
+        if random_features:
+            feature_keys = [key for key in data.keys() if key.startswith("feature_")]
+            for key in feature_keys:
+                buf[key].append(data[key])
 
     return buf
 
@@ -445,7 +452,7 @@ def characterize_all_transitions(model, data, best_predictions, cols, lengths, p
 
 
 def training_run_json_to_csv(save_dir, is_transformer, has_loss, lr, optimizer,
-                             init_scaling, input_dir=None, n_seeds=40):
+                             init_scaling, input_dir=None, n_seeds=40, clock_pizza_metrics=False, random_features=False):
 
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -459,7 +466,7 @@ def training_run_json_to_csv(save_dir, is_transformer, has_loss, lr, optimizer,
             + f"lr{lr}_{optimizer}_seed{seed}_scaling{init_scaling}/*.json"
         )
         pths = glob.glob(d)
-        vals = get_stats_for_run(pths, is_transformer, has_loss)
+        vals = get_stats_for_run(pths, is_transformer, has_loss, clock_pizza_metrics, random_features=random_features)
         df = pd.DataFrame(vals)
         df = df.reset_index()
         df.rename(columns={"index": "epoch"}, inplace=True)

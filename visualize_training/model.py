@@ -295,7 +295,7 @@ class PosEmbed(nn.Module):
 
 # | export
 class Attention(nn.Module):
-    def __init__(self, d_model, num_heads, d_head, n_ctx, model):
+    def __init__(self, d_model, num_heads, d_head, n_ctx, attn_coeff, model):
         super().__init__()
         self.model = model
         self.W_K = nn.Parameter(
@@ -310,6 +310,7 @@ class Attention(nn.Module):
         self.W_O = nn.Parameter(
             torch.randn(d_model, d_head * num_heads) / np.sqrt(d_model)
         )
+        self.attn_coeff = attn_coeff
         self.register_buffer("mask", torch.tril(torch.ones((n_ctx, n_ctx))))
         self.d_head = d_head
         self.hook_k = HookPoint()
@@ -320,23 +321,18 @@ class Attention(nn.Module):
         self.hook_attn_pre = HookPoint()
 
     def forward(self, x):
-        k = self.hook_k(torch.einsum("ihd,bpd->biph", self.W_K, x))
-        q = self.hook_q(torch.einsum("ihd,bpd->biph", self.W_Q, x))
-        v = self.hook_v(torch.einsum("ihd,bpd->biph", self.W_V, x))
-        attn_scores_pre = torch.einsum("biph,biqh->biqp", k, q)
-        attn_scores_masked = torch.tril(attn_scores_pre) - 1e10 * (
-            1 - self.mask[: x.shape[-2], : x.shape[-2]]
-        )
+        k = self.hook_k(torch.einsum('ihd,bpd->biph', self.W_K, x))
+        q = self.hook_q(torch.einsum('ihd,bpd->biph', self.W_Q, x))
+        v = self.hook_v(torch.einsum('ihd,bpd->biph', self.W_V, x))
+        attn_scores_pre = torch.einsum('biph,biqh->biqp', k, q)
+        attn_scores_masked =attn_scores_pre
         attn_matrix = self.hook_attn(
-            F.softmax(
-                self.hook_attn_pre(attn_scores_masked / np.sqrt(self.d_head)), dim=-1
-            )
-        )
-        z = self.hook_z(torch.einsum("biph,biqp->biqh", v, attn_matrix))
-        z_flat = einops.rearrange(z, "b i q h -> b q (i h)")
-        out = torch.einsum("df,bqf->bqd", self.W_O, z_flat)
+            F.softmax(self.hook_attn_pre(attn_scores_masked/np.sqrt(self.d_head)), dim=-1)\
+            *self.attn_coeff+(1-self.attn_coeff))
+        z = self.hook_z(torch.einsum('biph,biqp->biqh', v, attn_matrix))
+        z_flat = einops.rearrange(z, 'b i q h -> b q (i h)')
+        out = torch.einsum('df,bqf->bqd', self.W_O, z_flat)
         return out
-
 
 # | export
 class FF(nn.Module):
@@ -366,12 +362,12 @@ class FF(nn.Module):
 # export
 class TransformerBlock(nn.Module):
     def __init__(
-        self, d_model, d_mlp, d_head, num_heads, n_ctx, act_type, model, use_ln=False
+        self, d_model, d_mlp, d_head, num_heads, n_ctx, act_type, attn_coeff, model, use_ln=False
     ):
         super().__init__()
         self.model = model
         self.ln1 = nn.LayerNorm(d_model)
-        self.attn = Attention(d_model, num_heads, d_head, n_ctx, model=self.model)
+        self.attn = Attention(d_model, num_heads, d_head, n_ctx, attn_coeff=attn_coeff, model=self.model)
         self.ln2 = nn.LayerNorm(d_model)
         self.mlp = FF(d_model, d_mlp, act_type, model=self.model)
         self.hook_attn_out = HookPoint()
@@ -403,6 +399,7 @@ class Transformer(nn.Module):
         num_heads,
         num_layers,
         n_ctx,
+        attn_coeff,
         act_type="ReLU",
         use_ln=False,
     ):
@@ -419,6 +416,7 @@ class Transformer(nn.Module):
                     num_heads=num_heads,
                     n_ctx=n_ctx,
                     act_type=act_type,
+                    attn_coeff=attn_coeff,
                     model=[self],
                     use_ln=use_ln,
                 )
@@ -438,6 +436,14 @@ class Transformer(nn.Module):
             x = block(x)
         x = self.unembed(x)
         return x
+    
+    def forward_h(self, x):
+        x = self.embed(x)
+        tmp = x
+        x = self.pos_embed(x)
+        for blk in self.blocks:
+            x = blk(x)
+        return tmp, x
 
     def forward_h(self, x):
         x = self.embed(x)

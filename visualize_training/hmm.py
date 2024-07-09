@@ -7,14 +7,14 @@ from hmmlearn import hmm
 from tqdm import trange
 from visualize_training.utils import characterize_all_transitions
 
-
 class HMM():
 
-    def __init__(self, max_components, cov_type, n_seeds, n_iter):
+    def __init__(self, max_components, cov_type, n_seeds, n_iter, seeds=None):
         self.max_components = max_components
         self.cov_type = cov_type
         self.n_seeds = n_seeds
         self.n_iter = n_iter
+        self.seeds = seeds
 
     def _make_hmm_data(self, data_dir, cols, sort, sort_col, first_n):
 
@@ -66,7 +66,9 @@ class HMM():
         train_lengths = [len(df) for df in train_dfs]
         test_lengths = [len(df) for df in test_dfs]
 
-        for seed in range(self.n_seeds):
+        seeds = self.seeds if self.seeds else list(range(self.n_seeds))
+
+        for seed in seeds:
             model = hmm.GaussianHMM(
                 n_components=n_components, covariance_type=self.cov_type,
                 n_iter=self.n_iter
