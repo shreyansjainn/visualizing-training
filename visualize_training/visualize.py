@@ -2,6 +2,9 @@
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import glob
+import pandas as pd
+from scipy.stats import zscore
 import networkx as nx
 import gravis as gv
 import numpy as np
@@ -10,7 +13,7 @@ from visualize_training.constants import HEX_VALUES
 
 
 def visualize_hmm_loss(data, phase_col: str, epoch_col: str, loss_col: str,
-                       hover_data: Dict = None):
+                       hover_data: Dict = None, norm_y: bool = False, log_y:bool = False):
 
     """Visualize HMM loss plot against the Epochs
 
@@ -24,12 +27,23 @@ def visualize_hmm_loss(data, phase_col: str, epoch_col: str, loss_col: str,
          value against them for visibility in tooltip during hover
 
     """
+    x = data[epoch_col]
+    x_label = epoch_col
+    if log_y:
+        y = np.log(data[loss_col])
+        y_label = "log_"+loss_col
+    elif norm_y:
+        y = np.apply_along_axis(zscore, 0, data[loss_col].to_numpy())
+        y_label = "norm_"+loss_col
+    else:
+        y = data[loss_col]
+        y_label = loss_col
 
-    fig = px.scatter(data, x=epoch_col, y=loss_col,
+    fig = px.scatter(x=x, y=y, labels={"x": x_label, "y": y_label},
                      color=data[phase_col].tolist(), hover_data=hover_data)
 
     fig.add_trace(go.Scatter(mode='lines',
-                             x=data[epoch_col], y=data[loss_col],
+                             x=x, y=y,
                              line_color='black', line_width=1,
                              showlegend=False, line=dict(dash='dot')))
     fig.show()
@@ -62,9 +76,10 @@ def visualize_dag(transmat, node_hover_dict: Dict = None,
                     dot.add_node(i, label=str(i+1), color=hex[i % len(hex)],
                                  size=10)
                 if edge_hover_dict:
-                    dot.add_edge(i, j, label=np.round(transmat[i][j], 3),
-                                 label_size=10, length=10,
-                                 hover=edge_hover_dict[str(i)+">>"+str(j)]['cols'])
+                    if edge_hover_dict[str(i)+">>"+str(j)]['feature_changes'] != []:
+                        dot.add_edge(i, j, label=np.round(transmat[i][j], 3),
+                                     label_size=10, length=10,
+                                     hover=edge_hover_dict[str(i)+">>"+str(j)]['cols'])
                 else:
                     dot.add_edge(i, j, label=np.round(transmat[i][j], 3),
                                  label_size=10, length=10)
@@ -113,4 +128,25 @@ def visualize_avg_log_likelihood(data, dataset_name,
     fig.update_yaxes(title_text="Average log density", secondary_y=False)
     fig.update_yaxes(title_text="AIC/BIC", secondary_y=True)
 
+    fig.show()
+
+
+def visualize_all_seeds(data_dir, loss_col: str, log_bool: bool = False):
+
+    """Visualize HMM loss plots against the Epochs for all the random seeds
+
+    """
+    loss_values = [
+        pd.read_csv(file)[loss_col].rename(loss_col+f'_{x}')
+        for x, file in enumerate(glob.glob(data_dir + "*.csv"))
+        ]
+    df = pd.DataFrame(loss_values).T
+    df[loss_col + "_avg"] = df.mean(axis=1)
+    if log_bool:
+        df = df.apply(np.log, axis = 1)
+    fig = px.line(df, y=df.columns[:-1],)
+    fig.update_traces(line_color='#FF7F7F')
+    fig.add_trace(go.Scatter(mode='lines', y=df.iloc[:, -1],
+                             line_color='black', line_width=5, name="avg",
+                             showlegend=True, line=dict(dash='dot')))
     fig.show()
