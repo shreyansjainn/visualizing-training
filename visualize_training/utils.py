@@ -195,6 +195,7 @@ def get_stats_for_run(file_pths, is_transformer, has_loss=False, clock_pizza_met
             buf["grad_sym"].append(data["grad_sym"])
             buf["dist_irr"].append(data["dist_irr"])
 
+
         if has_loss:
             buf["train_loss"].append(data["train_loss"])
             buf["eval_loss"].append(data["eval_loss"])

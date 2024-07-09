@@ -14,6 +14,7 @@ from visualize_training.metrics import (
 )
 
 
+
 class ModelManager:
     def __init__(self, model, train_dataloader, test_dataloader, full_dataloader, config):
         self.model = model
@@ -71,6 +72,7 @@ class ModelManager:
         self.training_metrics = {"loss": [], "accuracy": [], "grad_sym": [], "dist_irr": []}
 
         self._track_random_features()
+
 
     def _load_eval(self):
         self.train_accuracy = evaluate.load(
@@ -239,6 +241,7 @@ class ModelManager:
                             }
                         )
 
+
                     self.training_metrics["loss"].append(
                         {"epoch": epoch, "steps": self.steps, "train_loss": train_loss, "eval_loss": eval_loss}
                     )
@@ -318,6 +321,24 @@ class ModelManager:
                     ),
                     None,
                 )
+                
+                grad_sym_data = next(
+                    (
+                        item
+                        for item in self.training_metrics["grad_sym"]
+                        if item["steps"] == step and item["epoch"] == epoch
+                    ),
+                    None,
+                )
+                
+                dist_irr_data = next(
+                    (
+                        item
+                        for item in self.training_metrics["dist_irr"]
+                        if item["steps"] == step and item["epoch"] == epoch
+                    ),
+                    None,
+                )
 
                 if self.config.get("clock_pizza_metrics"):
                     grad_sym_data = next(
@@ -359,6 +380,9 @@ class ModelManager:
                             "eval_loss": train_data["eval_loss"] if train_data else None,
                             "train_accuracy": accuracy_data["train_accuracy"] if accuracy_data else None,
                             "eval_accuracy": accuracy_data["eval_accuracy"] if accuracy_data else None,
+                            "grad_sym": grad_sym_data['grad_sym'] if grad_sym_data else None,
+                            "train_dist_irr": dist_irr_data['train_dist_irr'] if dist_irr_data else None,
+                            "test_dist_irr": dist_irr_data['test_dist_irr'] if dist_irr_data else None
                         }
 
                         if self.config.get("clock_pizza_metrics"):
@@ -512,6 +536,9 @@ class ModelManager:
                     "eval_loss": highest_step_metric.get("eval_loss"),
                     "train_accuracy": highest_step_metric.get("train_accuracy"),
                     "eval_accuracy": highest_step_metric.get("eval_accuracy"),
+                    "grad_sym": highest_step_metric.get("grad_sym"),
+                    "train_dist_irr": highest_step_metric.get("train_dist_irr"),
+                    "test_dist_irr": highest_step_metric.get("test_dist_irr")
                 }
 
                 if self.config.get("clock_pizza_metrics"):
