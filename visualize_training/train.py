@@ -381,8 +381,7 @@ class ModelManager:
                             "train_accuracy": accuracy_data["train_accuracy"] if accuracy_data else None,
                             "eval_accuracy": accuracy_data["eval_accuracy"] if accuracy_data else None,
                             "grad_sym": grad_sym_data['grad_sym'] if grad_sym_data else None,
-                            "train_dist_irr": dist_irr_data['train_dist_irr'] if dist_irr_data else None,
-                            "test_dist_irr": dist_irr_data['test_dist_irr'] if dist_irr_data else None
+                            "dist_irr": dist_irr_data['dist_irr'] if dist_irr_data else None,
                         }
 
                         if self.config.get("clock_pizza_metrics"):
