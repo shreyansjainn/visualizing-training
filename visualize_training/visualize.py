@@ -13,7 +13,8 @@ from visualize_training.constants import HEX_VALUES
 
 
 def visualize_hmm_loss(data, phase_col: str, epoch_col: str, loss_col: str,
-                       hover_data: Dict = None, norm_y: bool = False, log_y:bool = False):
+                       hover_data: Dict = None, norm_y: bool = False,
+                       log_y: bool = False, hex: List = HEX_VALUES):
 
     """Visualize HMM loss plot against the Epochs
 
@@ -27,6 +28,7 @@ def visualize_hmm_loss(data, phase_col: str, epoch_col: str, loss_col: str,
          value against them for visibility in tooltip during hover
 
     """
+    data['color'] = data.apply(lambda x: hex[x['phases']-1 % len(hex)], axis=1)
     x = data[epoch_col]
     x_label = epoch_col
     if log_y:
@@ -40,12 +42,25 @@ def visualize_hmm_loss(data, phase_col: str, epoch_col: str, loss_col: str,
         y_label = loss_col
 
     fig = px.scatter(x=x, y=y, labels={"x": x_label, "y": y_label},
-                     color=data[phase_col].tolist(), hover_data=hover_data)
+                     hover_data={"phase": data[phase_col]})
+
+    fig.update_traces(marker=dict(
+        color=data['color']))
 
     fig.add_trace(go.Scatter(mode='lines',
                              x=x, y=y,
                              line_color='black', line_width=1,
-                             showlegend=False, line=dict(dash='dot')))
+                             showlegend=False, line=dict(dash='dot'),
+                             hoverinfo='skip'))
+
+    fig.update_xaxes(gridcolor="lightgrey", linecolor="black", mirror=True)
+    fig.update_yaxes(gridcolor="lightgrey", linecolor="black", mirror=True)
+
+    fig.update_layout(
+        title=f"plot {x_label} vs {y_label}",
+        plot_bgcolor='white'
+        )
+
     fig.show()
 
 
@@ -65,24 +80,26 @@ def visualize_dag(transmat, node_hover_dict: Dict = None,
     """
 
     n = transmat.shape[0]
-    dot = nx.DiGraph()
+    dot = nx.DiGraph(directed=True)
     for i in range(n):
         for j in range(n):
-            if np.round(transmat[i][j], 3) > 0:
+            if np.round(transmat[i][j], 2) > 0:
                 if node_hover_dict:
                     dot.add_node(i, label=str(i+1), color=hex[i % len(hex)],
-                                 size=10, hover=node_hover_dict[str(i+1)])
+                                 size=20, hover=node_hover_dict[str(i+1)],
+                                 label_size=10)
                 else:
                     dot.add_node(i, label=str(i+1), color=hex[i % len(hex)],
-                                 size=10)
-                if edge_hover_dict:
-                    if edge_hover_dict[str(i)+">>"+str(j)]['feature_changes'] != []:
+                                 size=20)
+                if i!=j:
+                    if edge_hover_dict:
+                        if edge_hover_dict[str(i)+">>"+str(j)]['feature_changes'] != []:
+                            dot.add_edge(i, j, label=np.round(transmat[i][j], 3),
+                                         label_size=10, length=10,
+                                         hover=edge_hover_dict[str(i)+">>"+str(j)]['cols'])
+                    else:
                         dot.add_edge(i, j, label=np.round(transmat[i][j], 3),
-                                     label_size=10, length=10,
-                                     hover=edge_hover_dict[str(i)+">>"+str(j)]['cols'])
-                else:
-                    dot.add_edge(i, j, label=np.round(transmat[i][j], 3),
-                                 label_size=10, length=10)
+                                     label_size=10, length=10)
 
     return gv.d3(dot, edge_label_data_source='label', show_edge_label=True,
                  node_label_data_source='label', node_hover_neighborhood=True,
@@ -98,35 +115,58 @@ def visualize_avg_log_likelihood(data, dataset_name,
     x = np.arange(1, max_components + 1)
 
     fig.add_trace(go.Scatter(
+        x=x,
+        y=pd.Series(data['mean_scores']) + data['scores_stdev'],
+        mode='lines', marker=dict(color="#444"),
+        line=dict(width=0), name="log density (upper bound)",
+        hoverinfo='skip', showlegend=False))
+
+    fig.add_trace(go.Scatter(
+        x=x,
+        y=pd.Series(data['mean_scores']) - data['scores_stdev'],
+        mode='lines', marker=dict(color="#444"),
+        line=dict(width=0), name="log density (lower bound)",
+        fillcolor='rgba(68, 68, 68, 0.3)', fill='tonexty', showlegend=False,
+        hoverinfo='skip'))
+
+    fig.add_trace(
+        go.Scatter(x=x, y=data["aics"], name="AIC (right axis)", marker=dict(
+            color='red', size=10),
+                   hovertemplate="AIC (right axis): %{y:.2f}"),
+        secondary_y=True,
+    )
+
+    fig.add_trace(
+        go.Scatter(x=x, y=data["bics"], name="BIC (right axis)",marker=dict(
+            color='green', size=10), hovertemplate="BIC (right axis): %{y:.2f}"),
+        secondary_y=True,
+    )
+
+    fig.add_trace(go.Scatter(
             x=x,
-            y=data["mean_scores"], error_y=dict(
-                type='data',  # value of error bar given in data coordinates
-                array=data["scores_stdev"],
-                visible=True), name='log density (left axis)'))
-
-    fig.add_trace(
-        go.Scatter(x=x, y=data["aics"], name="AIC (right axis)"),
-        secondary_y=True,
-    )
-
-    fig.add_trace(
-        go.Scatter(x=x, y=data["bics"], name="BIC (right axis)"),
-        secondary_y=True,
-    )
+            y=data["mean_scores"],marker=dict(
+                color='blue', size=10), hoverinfo="skip",
+            hovertemplate="<extra></extra><b>No of Components: %{x:,.0f}</b><br>" + "Log Density (left axis): %{y:.2f}<br>"))
 
     fig.update_layout(
         autosize=False,
         width=1300,
-        height=600,
-        title=f"{dataset_name}"
+        height=800,
+        title="plotly test",
+        hovermode="x unified",
+        plot_bgcolor='white'
     )
 
     # Set x-axis title
-    fig.update_xaxes(title_text="Number of HMM components")
+    fig.update_xaxes(title_text="Number of HMM components",
+                     gridcolor="lightgrey",
+                     linecolor="black", mirror=True)
 
     # Set y-axes titles
-    fig.update_yaxes(title_text="Average log density", secondary_y=False)
-    fig.update_yaxes(title_text="AIC/BIC", secondary_y=True)
+    fig.update_yaxes(title_text="Average log density", secondary_y=False,
+                     gridcolor="lightgrey", linecolor="black")
+    fig.update_yaxes(title_text="AIC/BIC", secondary_y=True,
+                     gridcolor="lightgrey", linecolor="black")
 
     fig.show()
 

@@ -414,15 +414,14 @@ def characterize_transition_between_phases(model, data, best_predictions, cols,
     Compute the average derivative for each feature, sort features by
     highest absolute value
     '''
-    features = get_features_for_transition(model, data, best_predictions,
-                                           lengths, i, j)
+    features = get_features_for_transition(model, data, best_predictions, lengths, i, j)
 
     if len(features) != 0:
-        features = np.mean(features, axis=0)
+        features = np.round(np.mean(features, axis=0),2)
 
     order = np.argsort(np.abs(features))[::-1]
 
-    feature_changes = np.array(get_difference_bt_means(model, i, j))
+    feature_changes = np.round(np.array(get_difference_bt_means(model, i, j)), 2)
     if len(order) != 0:
         return np.array(cols)[order].tolist(), feature_changes[order].tolist(), features[order].tolist()
     else:
