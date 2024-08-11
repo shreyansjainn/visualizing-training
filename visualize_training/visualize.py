@@ -57,7 +57,7 @@ def visualize_hmm_loss(data, phase_col: str, epoch_col: str, loss_col: str,
     fig.update_yaxes(gridcolor="lightgrey", linecolor="black", mirror=True)
 
     fig.update_layout(
-        title=f"plot {x_label} vs {y_label}",
+        title=f"{x_label} vs {y_label}",
         plot_bgcolor='white'
         )
 
@@ -144,9 +144,9 @@ def visualize_avg_log_likelihood(data, dataset_name,
 
     fig.add_trace(go.Scatter(
             x=x,
-            y=data["mean_scores"],marker=dict(
-                color='blue', size=10), hoverinfo="skip",
-            hovertemplate="<extra></extra><b>No of Components: %{x:,.0f}</b><br>" + "Log Density (left axis): %{y:.2f}<br>"))
+            y=data["mean_scores"], name="Avg Log Density (left axis)",
+            marker=dict(color='blue', size=10), hoverinfo="skip",
+            hovertemplate="<extra></extra><b>No of Components: %{x:,.0f}</b><br>" + "Avg Log Density (left axis): %{y:.2f}<br>"))
 
     fig.update_layout(
         autosize=False,
@@ -183,10 +183,24 @@ def visualize_all_seeds(data_dir, loss_col: str, log_bool: bool = False):
     df = pd.DataFrame(loss_values).T
     df[loss_col + "_avg"] = df.mean(axis=1)
     if log_bool:
-        df = df.apply(np.log, axis = 1)
-    fig = px.line(df, y=df.columns[:-1],)
-    fig.update_traces(line_color='#FF7F7F')
+        df = df.apply(np.log, axis=1)
+    fig = px.line(df, y=df.columns[:-1])
+    fig.update_traces(line_color='#FF7F7F', line_width=2)
+    fig.update_traces(
+        hovertemplate="<br>".join(["%{y:.2f}"]))
     fig.add_trace(go.Scatter(mode='lines', y=df.iloc[:, -1],
-                             line_color='black', line_width=5, name="avg",
-                             showlegend=True, line=dict(dash='dot')))
+                             line_color='black', line_width=4,
+                             name=f"{loss_col}_avg", showlegend=True,
+                             line=dict(dash='dot')))
+    fig.update_traces(
+        hovertemplate="<br>".join(["%{y:.2f}"]))
+    fig.update_xaxes(gridcolor="lightgrey", linecolor="black", mirror=True)
+    fig.update_yaxes(gridcolor="lightgrey", linecolor="black", mirror=True)
+
+    fig.update_layout(
+            title=f"all seeds for {loss_col}",
+            plot_bgcolor='white',
+            yaxis={"title": loss_col}, xaxis={"title": "Epoch"},
+            hovermode="x")
+
     fig.show()
