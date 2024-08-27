@@ -20,4 +20,10 @@ import visualize_training
 
 ### Key Features
 
-This package will
+Key features include:
+
+- Flexibility to define your own Neural Network architecture (currently it supports Transformer, MLPs, Resnet, LeNet5)
+- Add custom hookpoints to collect data at different stages of the architecture
+- Calculation of select metrics on the data collected
+- Latent State predictions using [Hidden Markov Models (HMM)](https://en.wikipedia.org/wiki/Hidden_Markov_model) to analyze the Training Dynamics
+- Interactive Visualization of Training Dynamics & Generalization Strategies in the form of network graphs and line charts.
