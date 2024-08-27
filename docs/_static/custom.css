@@ -1,0 +1,27 @@
+table {
+  width: 100%;
+  table-layout: fixed; /* Ensures that columns have fixed widths */
+}
+
+th,
+td {
+  padding: 8px;
+  line-height: 40px;
+  text-align: left;
+  overflow-wrap: break-word; /* Ensures long words break and wrap */
+  word-break: break-word; /* Ensures long words or strings break */
+}
+th:nth-child(1) {
+  width: 18%; /* Width for the first column */
+}
+th:nth-child(2) {
+  width: 70%; /* Width for the second column */
+}
+th:nth-child(3) {
+  width: 12%; /* Width for the third column */
+}
+
+.wy-table-responsive table td,
+.wy-table-responsive table th {
+  white-space: inherit;
+}
