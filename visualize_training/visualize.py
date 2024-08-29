@@ -152,7 +152,7 @@ def visualize_avg_log_likelihood(data, dataset_name,
         autosize=False,
         width=1300,
         height=800,
-        title="plotly test",
+        title=dataset_name,
         hovermode="x unified",
         plot_bgcolor='white'
     )

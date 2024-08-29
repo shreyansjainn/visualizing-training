@@ -6,7 +6,7 @@ table {
 th,
 td {
   padding: 8px;
-  line-height: 40px;
+  line-height: 30px;
   text-align: left;
   overflow-wrap: break-word; /* Ensures long words break and wrap */
   word-break: break-word; /* Ensures long words or strings break */
