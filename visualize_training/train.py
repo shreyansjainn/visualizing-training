@@ -4,7 +4,6 @@ import os
 import evaluate
 import torch
 from accelerate import Accelerator
-from sklearn.random_projection import GaussianRandomProjection
 from visualize_training.metrics import (
     distance_irrelevance,
     get_distribution_stats,
@@ -31,7 +30,6 @@ class ModelManager:
                 weight_decay=self.config.get("weight_decay"),
                 betas=(0.9, 0.98),
             )
-            # self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda step: min(step/10, 1))
         elif self.config.get("optimizer") == "sgd":
             self.optimizer = torch.optim.SGD(
                 self.model.parameters(), lr=self.config.get("lr", 1e-3), weight_decay=self.config.get("weight_decay")
@@ -68,11 +66,7 @@ class ModelManager:
         self.hooks = []
         self.metrics_cache = []
         self.weights_biases_cache = {}
-        self.weight_projections = []
         self.training_metrics = {"loss": [], "accuracy": [], "grad_sym": [], "dist_irr": []}
-
-        self._track_random_features()
-
 
     def _load_eval(self):
         self.train_accuracy = evaluate.load(
@@ -107,8 +101,7 @@ class ModelManager:
             # Initialize cache entry with epoch, steps, and layer name
             cache_entry = {"epoch": self.epoch, "steps": self.steps, "layer_name": name}
 
-            # Iterate through all named parameters of th
-            # e module
+            # Iterate through all named parameters of the module
             for param_name, param_value in module.named_parameters():
                 cache_entry[param_name] = param_value.clone().detach().cpu().numpy()
 
@@ -117,39 +110,6 @@ class ModelManager:
                 self.weights_biases_cache.get(name) and self.weights_biases_cache[name][-1]["steps"] == self.steps
             ):
                 self.weights_biases_cache.setdefault(name, []).append(cache_entry)
-
-    def _flatten_parameters(self):
-        return torch.cat(
-            [
-                p.data.view(-1)
-                for name, p in self.model.named_parameters()
-                if p.requires_grad and name in self.config["parameters"]
-            ]
-        )
-
-    def _random_features(self, module, input):
-        if (self.epoch) % self.config["eval_every"] == 0:
-            with torch.no_grad():
-                # Flatten all parameters into a single vector
-                flat_weights = self._flatten_parameters().cpu().numpy().reshape(1, -1)
-
-                # Project the weights
-                projection = self.projector.fit_transform(flat_weights)
-
-                if not self.weight_projections or self.weight_projections[-1]["steps"] != self.steps:
-                    self.weight_projections.append(
-                        {"proj": projection.flatten(), "epoch": self.epoch, "steps": self.steps}
-                    )
-
-    def _track_random_features(self):
-        if self.config.get("random_features"):
-            if not self.config.get("parameters"):
-                raise ValueError("Please provide parameter names in the config to track random features from")
-
-            self.projector = GaussianRandomProjection(
-                n_components=self.config.get("projection_dim", 16), random_state=self.config["seed"]
-            )
-            self.hooks.append(self.model.register_forward_pre_hook(self._random_features))
 
     def remove_hooks(self):
         for hook in self.hooks:
@@ -359,12 +319,6 @@ class ModelManager:
                         None,
                     )
 
-                if self.config.get("random_features"):
-                    weight_projection = next(
-                        (item for item in self.weight_projections if item["steps"] == step and item["epoch"] == epoch),
-                        None,
-                    )
-
                 if self.config.get("is_transformer"):
                     if key not in metrics_per_step:
                         metrics_per_step[key] = {
@@ -387,9 +341,6 @@ class ModelManager:
                         if self.config.get("clock_pizza_metrics"):
                             metrics_per_step[key]["grad_sym"] = grad_sym_data["grad_sym"] if grad_sym_data else None
                             metrics_per_step[key]["dist_irr"] = dist_irr_data["dist_irr"] if dist_irr_data else None
-
-                        if self.config.get("random_features"):
-                            metrics_per_step[key]["proj"] = weight_projection["proj"] if weight_projection else None
 
                         aggregated_weights[key] = []
                         aggregated_biases[key] = []
@@ -554,11 +505,6 @@ class ModelManager:
                     "train_accuracy": highest_step_metric.get("train_accuracy"),
                     "eval_accuracy": highest_step_metric.get("eval_accuracy"),
                 }
-
-            if self.config.get("random_features"):
-                # this is a list put each value as separate key in format feature_0, feature_1, ...
-                for i, proj in enumerate(highest_step_metric.get("proj", []).tolist()):
-                    filtered_metrics[f"feature_{i}"] = proj
 
             metrics_filename = os.path.join(self.save_path, f"epoch{epoch}.json")
             with open(metrics_filename, "w") as f:
