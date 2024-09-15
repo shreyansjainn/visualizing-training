@@ -3,6 +3,8 @@ from itertools import chain
 from collections import defaultdict
 import numpy as np
 import os
+from torch.utils.data import DataLoader
+import torch
 import glob
 import pandas as pd
 from hmmlearn import _hmmc
@@ -10,6 +12,7 @@ import pickle
 from sklearn.model_selection import train_test_split
 from scipy.stats import zscore
 from graphviz import Digraph
+from visualize_training.data import MyAddDataSet
 
 
 def get_markov_chain(matrix):
@@ -474,3 +477,24 @@ def training_run_json_to_csv(save_dir, is_transformer, has_loss, lr, optimizer,
         file_name = f"lr{lr}_{optimizer}_seed{seed}_scaling{init_scaling}.csv"
 
         df.to_csv(f"{save_dir}/{file_name}")
+
+def get_dataloaders(config):
+    device = 'cpu' if config.get('cpu') else 'cuda'
+    config['func']=eval(config['funcs'])
+    useLinear=config.get('use_linear',False)
+    full_dataset = MyAddDataSet(func=config['func'],C=config['C'],diff_vocab=config['diff_vocab'],eqn_sign=config['eqn_sign'],device=device)
+    train_size = int(config['frac'] * len(full_dataset))
+    test_size = len(full_dataset) - train_size
+    train_dataset, test_dataset = torch.utils.data.random_split(full_dataset, [train_size, test_size])
+    print('random split',len(train_dataset),len(test_dataset))
+    batch_size = config.get('batch_size',len(full_dataset))
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    return train_loader, test_loader
+
+def get_dataloaders_with_full_dataset(config):
+    config['func']=eval(config['funcs'])
+    useLinear=config.get('use_linear',False)
+    full_dataset = MyAddDataSet(func=config['func'],C=config['C'],diff_vocab=config['diff_vocab'],eqn_sign=config['eqn_sign'])
+    data_loader = torch.utils.data.DataLoader(full_dataset, batch_size=config['C']*config['C'])
+    return data_loader

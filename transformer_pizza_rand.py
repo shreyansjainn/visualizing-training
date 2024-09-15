@@ -5,8 +5,8 @@ from visualize_training.train import ModelManager
 from visualize_training.utils import training_run_json_to_csv, save_model
 from visualize_training.hmm import HMM
 
-from pizza.model import Transformer
-from pizza.data import get_dataloaders, get_dataloaders_with_full_dataset
+from visualize_training.model import Transformer
+from visualize_training.utils import get_dataloaders, get_dataloaders_with_full_dataset
 
 
 def main():
