@@ -212,106 +212,69 @@ class MLP(nn.Module):
 
 
 class HookPoint(nn.Module):
-    """A helper class to get access to intermediate activations (inspired by Garcon)
-    It's a dummy module that is the identity function by default
-    I can wrap any intermediate activation in a HookPoint and get a convenient way to add PyTorch hooks
-    """
-
     def __init__(self):
         super().__init__()
         self.fwd_hooks = []
         self.bwd_hooks = []
-
     def give_name(self, name):
-        # Called by the model at initialisation
         self.name = name
-
-    def add_hook(self, hook, dir="fwd"):
-        # Hook format is fn(activation, hook_name)
-        # Change it into PyTorch hook format (this includes input and output,
-        # which are the same for a HookPoint)
+    def add_hook(self, hook, dir='fwd'):
         def full_hook(module, module_input, module_output):
             return hook(module_output, name=self.name)
-
-        if dir == "fwd":
+        if dir=='fwd':
             handle = self.register_forward_hook(full_hook)
             self.fwd_hooks.append(handle)
-        elif dir == "bwd":
+        elif dir=='bwd':
             handle = self.register_backward_hook(full_hook)
             self.bwd_hooks.append(handle)
         else:
             raise ValueError(f"Invalid direction {dir}")
-
-    def remove_hooks(self, dir="fwd"):
-        if (dir == "fwd") or (dir == "both"):
+    def remove_hooks(self, dir='fwd'):
+        if (dir=='fwd') or (dir=='both'):
             for hook in self.fwd_hooks:
                 hook.remove()
             self.fwd_hooks = []
-        if (dir == "bwd") or (dir == "both"):
+        if (dir=='bwd') or (dir=='both'):
             for hook in self.bwd_hooks:
                 hook.remove()
             self.bwd_hooks = []
-        if dir not in ["fwd", "bwd", "both"]:
+        if dir not in ['fwd', 'bwd', 'both']:
             raise ValueError(f"Invalid direction {dir}")
-
     def forward(self, x):
         return x
 
-
-# %% ../transformer.ipynb 6
 class Embed(nn.Module):
-    """Define network architecture
-    I defined my own transformer from scratch so I'd fully understand each component
-    - I expect this wasn't necessary or particularly important, and a bunch of this replicates existing Pyt functionality
-    """
-
     def __init__(self, d_vocab, d_model):
         super().__init__()
-        self.W_E = nn.Parameter(torch.randn(d_model, d_vocab) / np.sqrt(d_model))
-
+        self.W_E = nn.Parameter(torch.randn(d_model, d_vocab)/np.sqrt(d_model))
     def forward(self, x):
-        return torch.einsum("dbp -> bpd", self.W_E[:, x])
+        return torch.einsum('dbp -> bpd', self.W_E[:, x])
 
-
-# | export
 class Unembed(nn.Module):
     def __init__(self, d_vocab, d_model):
         super().__init__()
-        self.W_U = nn.Parameter(torch.randn(d_model, d_vocab) / np.sqrt(d_vocab))
-
+        self.W_U = nn.Parameter(torch.randn(d_model, d_vocab)/np.sqrt(d_vocab))
     def forward(self, x):
-        return x @ self.W_U
+        return (x @ self.W_U)
 
-
-# | export
+# Positional Embeddings
 class PosEmbed(nn.Module):
     def __init__(self, max_ctx, d_model):
         super().__init__()
-        self.W_pos = nn.Parameter(torch.randn(max_ctx, d_model) / np.sqrt(d_model))
-
+        self.W_pos = nn.Parameter(torch.randn(max_ctx, d_model)/np.sqrt(d_model))
     def forward(self, x):
-        return x + self.W_pos[: x.shape[-2]]
+        return x+self.W_pos[:x.shape[-2]]
 
-
-# | export
+# Attention
 class Attention(nn.Module):
-    def __init__(self, d_model, num_heads, d_head, n_ctx, attn_coeff, model):
+    def __init__(self, d_model, num_heads, d_head, n_ctx, attn_coeff):
         super().__init__()
-        self.model = model
-        self.W_K = nn.Parameter(
-            torch.randn(num_heads, d_head, d_model) / np.sqrt(d_model)
-        )
-        self.W_Q = nn.Parameter(
-            torch.randn(num_heads, d_head, d_model) / np.sqrt(d_model)
-        )
-        self.W_V = nn.Parameter(
-            torch.randn(num_heads, d_head, d_model) / np.sqrt(d_model)
-        )
-        self.W_O = nn.Parameter(
-            torch.randn(d_model, d_head * num_heads) / np.sqrt(d_model)
-        )
+        self.W_K = nn.Parameter(torch.randn(num_heads, d_head, d_model)/np.sqrt(d_model))
+        self.W_Q = nn.Parameter(torch.randn(num_heads, d_head, d_model)/np.sqrt(d_model))
+        self.W_V = nn.Parameter(torch.randn(num_heads, d_head, d_model)/np.sqrt(d_model))
+        self.W_O = nn.Parameter(torch.randn(d_model, d_head * num_heads)/np.sqrt(d_model))
         self.attn_coeff = attn_coeff
-        self.register_buffer("mask", torch.tril(torch.ones((n_ctx, n_ctx))))
+        self.register_buffer('mask', torch.tril(torch.ones((n_ctx, n_ctx))))
         self.d_head = d_head
         self.hook_k = HookPoint()
         self.hook_q = HookPoint()
@@ -326,114 +289,82 @@ class Attention(nn.Module):
         v = self.hook_v(torch.einsum('ihd,bpd->biph', self.W_V, x))
         attn_scores_pre = torch.einsum('biph,biqh->biqp', k, q)
         attn_scores_masked =attn_scores_pre
+        normalized = self.hook_attn_pre(attn_scores_masked/np.sqrt(self.d_head))
+        normalized = F.softmax(normalized, dim=-1)
         attn_matrix = self.hook_attn(
-            F.softmax(self.hook_attn_pre(attn_scores_masked/np.sqrt(self.d_head)), dim=-1)\
-            *self.attn_coeff+(1-self.attn_coeff))
+            normalized*self.attn_coeff+(1-self.attn_coeff))
         z = self.hook_z(torch.einsum('biph,biqp->biqh', v, attn_matrix))
         z_flat = einops.rearrange(z, 'b i q h -> b q (i h)')
         out = torch.einsum('df,bqf->bqd', self.W_O, z_flat)
         return out
-
-# | export
+    
 class FF(nn.Module):
-    def __init__(self, d_model, d_mlp, act_type, model):
+    def __init__(self, d_model, d_mlp, act_type):
         super().__init__()
-        self.model = model
-        self.W_in = nn.Parameter(torch.randn(d_mlp, d_model) / np.sqrt(d_model))
+        self.W_in = nn.Parameter(torch.randn(d_mlp, d_model)/np.sqrt(d_mlp))
         self.b_in = nn.Parameter(torch.zeros(d_mlp))
-        self.W_out = nn.Parameter(torch.randn(d_model, d_mlp) / np.sqrt(d_model))
+        self.W_out = nn.Parameter(torch.randn(d_model, d_mlp)/np.sqrt(d_model))
         self.b_out = nn.Parameter(torch.zeros(d_model))
         self.act_type = act_type
+        # self.ln = LayerNorm(d_mlp, model=self.model)
         self.hook_pre = HookPoint()
         self.hook_post = HookPoint()
-        assert act_type in ["ReLU", "GeLU"]
-
+        assert act_type in ['ReLU', 'GeLU', 'Tanh']
+        
     def forward(self, x):
-        x = self.hook_pre(torch.einsum("md,bpd->bpm", self.W_in, x) + self.b_in)
-        if self.act_type == "ReLU":
+        x = self.hook_pre(torch.einsum('md,bpd->bpm', self.W_in, x) + self.b_in)
+        if self.act_type=='ReLU':
             x = F.relu(x)
-        elif self.act_type == "GeLU":
+        elif self.act_type=='GeLU':
             x = F.gelu(x)
+        elif self.act_type=='Tanh':
+            x = F.tanh(x)
         x = self.hook_post(x)
-        x = torch.einsum("dm,bpm->bpd", self.W_out, x) + self.b_out
+#        return x
+        x = torch.einsum('dm,bpm->bpd', self.W_out, x) + self.b_out
         return x
-
-
-# export
+        
+# Transformer Block
 class TransformerBlock(nn.Module):
-    def __init__(
-        self, d_model, d_mlp, d_head, num_heads, n_ctx, act_type, attn_coeff, model, use_ln=False
-    ):
+    def __init__(self, d_model, d_head, num_heads, n_ctx, act_type, attn_coeff):
         super().__init__()
-        self.model = model
-        self.ln1 = nn.LayerNorm(d_model)
-        self.attn = Attention(d_model, num_heads, d_head, n_ctx, attn_coeff=attn_coeff, model=self.model)
-        self.ln2 = nn.LayerNorm(d_model)
-        self.mlp = FF(d_model, d_mlp, act_type, model=self.model)
+        self.attn = Attention(d_model, num_heads, d_head, n_ctx, attn_coeff=attn_coeff)
+        self.mlp = FF(d_model, d_model*4,act_type)
         self.hook_attn_out = HookPoint()
         self.hook_mlp_out = HookPoint()
         self.hook_resid_pre = HookPoint()
         self.hook_resid_mid = HookPoint()
         self.hook_resid_post = HookPoint()
-        self.use_ln = use_ln
-
+    
     def forward(self, x):
-        x = self.hook_resid_mid(
-            x + self.hook_attn_out(self.attn((self.hook_resid_pre(x))))
-        )
-        if self.use_ln:
-            x = self.ln1(x)
-        x = self.hook_resid_post(x + self.hook_mlp_out(self.mlp((x))))
-        if self.use_ln:
-            x = self.ln2(x)
+        x = self.hook_resid_mid(x + self.hook_attn_out(self.attn(self.hook_resid_pre(x))))
+        x = self.hook_resid_post(x + self.hook_mlp_out(self.mlp(x)))
         return x
+# -
 
-
-# | export
+# Full transformer
 class Transformer(nn.Module):
-    def __init__(
-        self,
-        d_model,
-        d_head,
-        d_vocab,
-        num_heads,
-        num_layers,
-        n_ctx,
-        attn_coeff,
-        act_type="ReLU",
-        use_ln=False,
-    ):
-        """this function could be augmented to contain more options for creating different architectures"""
+    def __init__(self, num_layers, d_vocab, d_model, d_head, num_heads, n_ctx, act_type="ReLU", attn_coeff=1.0, use_cache=False, use_ln=True):
         super().__init__()
-        self.embed = Embed(d_vocab=d_vocab, d_model=d_model)
-        self.pos_embed = PosEmbed(max_ctx=n_ctx, d_model=d_model)
-        self.blocks = nn.ModuleList(
-            [
-                TransformerBlock(
-                    d_model=d_model,
-                    d_mlp=d_model * 4,
-                    d_head=d_head,
-                    num_heads=num_heads,
-                    n_ctx=n_ctx,
-                    act_type=act_type,
-                    attn_coeff=attn_coeff,
-                    model=[self],
-                    use_ln=use_ln,
-                )
-                for i in range(num_layers)
-            ]
-        )
-        self.unembed = Unembed(d_vocab=d_vocab, d_model=d_model)
+        assert 0<=attn_coeff<=1
+        self.cache = {}
+        self.use_cache = use_cache
+
+        self.embed = Embed(d_vocab, d_model)
+        self.pos_embed = PosEmbed(n_ctx, d_model)
+        self.unembed = Unembed(d_vocab, d_model)
+        self.use_ln = use_ln
+        self.blocks = nn.ModuleList([TransformerBlock(d_model, d_head, num_heads, n_ctx, act_type, attn_coeff) for i in range(num_layers)])
 
         for name, module in self.named_modules():
-            if type(module) == HookPoint:
+            if type(module)==HookPoint:
                 module.give_name(name)
-
+    
     def forward(self, x):
         x = self.embed(x)
         x = self.pos_embed(x)
-        for block in self.blocks:
-            x = block(x)
+        for blk in self.blocks:
+            x = blk(x)
         x = self.unembed(x)
         return x
     
@@ -445,34 +376,40 @@ class Transformer(nn.Module):
             x = blk(x)
         return tmp, x
 
-    def forward_h(self, x):
-        x = self.embed(x)
-        tmp = x
-        x = self.pos_embed(x)
-        for blk in self.blocks:
-            x = blk(x)
-        return tmp, x
-
+    def set_use_cache(self, use_cache):
+        self.use_cache = use_cache
+    
     def hook_points(self):
-        return [module for name, module in self.named_modules() if "hook" in name]
+        return [module for name, module in self.named_modules() if 'hook' in name]
 
     def remove_all_hooks(self):
         for hp in self.hook_points():
-            hp.remove_hooks("fwd")
-            hp.remove_hooks("bwd")
-
+            hp.remove_hooks('fwd')
+            hp.remove_hooks('bwd')
+    
     def cache_all(self, cache, incl_bwd=False):
         # Caches all activations wrapped in a HookPoint
         def save_hook(tensor, name):
             cache[name] = tensor.detach()
-
         def save_hook_back(tensor, name):
-            cache[name + "_grad"] = tensor[0].detach()
-
+            cache[name+'_grad'] = tensor[0].detach()
         for hp in self.hook_points():
-            hp.add_hook(save_hook, "fwd")
+            hp.add_hook(save_hook, 'fwd')
             if incl_bwd:
-                hp.add_hook(save_hook_back, "bwd")
+                hp.add_hook(save_hook_back, 'bwd')
+    
+    def parameters_norm(self):
+        # Returns the l2 norm of all parameters
+        return sum([torch.sum(p*p).item() for p in self.parameters()])**0.5
+    
+    def l2_norm(self):
+        # Returns the l2 norm of all parameters
+        return sum([torch.sum(p*p) for p in self.parameters()])
+    
+    def parameters_flattened(self):
+        # Returns all parameters as a single tensor
+        return torch.cat([p.view(-1) for p in self.parameters()]).detach().cpu().numpy()
+
 
 
 # from https://github.com/ejmichaud/grokking-squared/blob/0229df94de69b8384e560367280a43a238112bf5/notebooks/erics-implementation.ipynb

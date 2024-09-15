@@ -50,3 +50,40 @@ class SparseParity(Dataset):
 
     def __len__(self):
         return self.x.shape[0]
+    
+class MyAddDataSet(torch.utils.data.Dataset):
+    def __init__(self, func, C, diff_vocab=False, eqn_sign=False, device='cpu'):
+        self.func = func
+        dim = 2
+        self.dim = dim
+        self.C = C
+        self.inputs = []
+        self.outputs = []
+        self.vocab=C
+        self.device=device
+        if diff_vocab:
+            self.vocab*=2
+        if eqn_sign:
+            self.vocab+=1
+            self.dim+=1
+        self.vocab_out=0
+        for p in range(C**dim):
+            x = np.unravel_index(p, (C,)*dim)
+            o=self.func(x)
+            s=[x[0],x[1]]
+            if diff_vocab:
+                s[1]+=C
+            if eqn_sign:
+                s.append(self.vocab-1)
+            self.inputs.append(s)
+            self.outputs.append(o)
+            self.vocab_out=max(self.vocab_out, o+1)
+        if self.vocab_out!=C:
+            print(f'warning {self.vocab_out=} neq to {C=}')
+        self.inputs = torch.tensor(self.inputs, dtype=torch.long, device=self.device)
+        self.outputs = torch.tensor(self.outputs, dtype=torch.long, device=self.device)
+        print(self.inputs,self.outputs)
+    def __len__(self):
+        return len(self.outputs)
+    def __getitem__(self, idx):
+        return self.inputs[idx], self.outputs[idx]
