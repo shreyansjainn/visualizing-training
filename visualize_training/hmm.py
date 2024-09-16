@@ -31,7 +31,7 @@ class HMM():
             data_dir (str): Path to data files.
             cols (list): List of columns to be returned.
             sort (bool): Whether to sort the rows based on `sort_col` or not. 
-            sort_col (str): Column name based on sorting needs to be done.
+            sort_col (str): Column name based on which sorting needs to be done.
             first_n (int): No of rows to be returned for each data file.
 
         Returns:
