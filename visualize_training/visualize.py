@@ -110,6 +110,15 @@ def visualize_dag(transmat, node_hover_dict: Dict = None,
 
 def visualize_avg_log_likelihood(data, dataset_name,
                                  max_components=8):
+    """
+    Visualize average log likehood, AIC and BIC values against no of components. 
+    This visualization is helpful in choosing the best suited no of components.
+
+    Args:
+        data (dict): Dictionary containing all the mean scores, AIC and BIC values
+        dataset_name (str): Title of Chart (When working with multiple datasets, naming it after the dataset_name is the recommended approach)
+        max_components (int, optional): Max no of components for which HMM model needs to be trained for. Defaults to 8.
+    """
 
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     x = np.arange(1, max_components + 1)
@@ -172,9 +181,13 @@ def visualize_avg_log_likelihood(data, dataset_name,
 
 
 def visualize_all_seeds(data_dir, loss_col: str, log_bool: bool = False):
+    """
+    Visualize HMM loss plots against the Epochs for all the random seeds
 
-    """Visualize HMM loss plots against the Epochs for all the random seeds
-
+    Args:
+        data_dir (str): Path to data files.
+        loss_col (str): Name of the loss column to be visualized
+        log_bool (bool, optional): If log scale is to be considered or not. Defaults to False.
     """
     loss_values = [
         pd.read_csv(file)[loss_col].rename(loss_col+f'_{x}')
@@ -182,8 +195,10 @@ def visualize_all_seeds(data_dir, loss_col: str, log_bool: bool = False):
         ]
     df = pd.DataFrame(loss_values).T
     df[loss_col + "_avg"] = df.mean(axis=1)
+
     if log_bool:
         df = df.apply(np.log, axis=1)
+
     fig = px.line(df, y=df.columns[:-1])
     fig.update_traces(line_color='#FF7F7F', line_width=2)
     fig.update_traces(

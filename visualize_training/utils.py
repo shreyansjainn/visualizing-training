@@ -26,7 +26,24 @@ def get_markov_chain(matrix):
     return dot
 
 
-def make_hmm_data(data_dir, cols, sort=True, first_n=1000):
+def make_hmm_data(data_dir, cols, sort=True, first_n=1000, sort_col="epoch"):
+    """
+    Data Preprocessing method similar to the one present in HMM class.
+    Separate method intended to be used independently on need basis.
+
+    Args:
+        data_dir (str): Path to data files.
+        cols (list): List of columns to be returned.
+        sort (bool): Whether to sort the rows based on `sort_col` or not. Defaults to True.
+        first_n (int): No of rows to be returned for each data file. Defaults to 1000.
+        sort_col (str): Column name based on which sorting needs to be done. Defaults to "epoch"
+
+    Returns:
+        train_dfs (list): List of dataframes for training the HMM
+        test_dfs (list): List of dataframes for testing the HMM
+        train_data (array): All the dataframes in `train_dfs` stacked vertically
+        test_data (array): All the dataframes in `test_dfs` stacked vertically
+    """
     print(data_dir)
     print(glob.glob(data_dir + "*"))
     if sort:
@@ -41,7 +58,7 @@ def make_hmm_data(data_dir, cols, sort=True, first_n=1000):
         except KeyError:
             dfs = [
                 pd.read_csv(file)
-                .sort_values("epoch")
+                .sort_values(sort_col)
                 # .sort_index()
                 .reset_index(drop=True)[cols]  # restrict to cols of interest
                 .head(first_n)
@@ -307,6 +324,15 @@ def find_i_followed_by_j(lst, i, j):
 
 
 def load_model(model_path):
+    """
+    Load trained HMM model from directory
+
+    Args:
+        model_path (str): Path to the directory of the model
+
+    Returns:
+        HMM Model object
+    """
 
     with open(model_path, 'rb') as f:
         model = pickle.load(f)
@@ -315,6 +341,13 @@ def load_model(model_path):
 
 
 def save_model(model_path, model):
+    """
+    Saves trained HMM model to directory
+
+    Args:
+        model_path (str): Directory path where model needs to be saved.
+        model: Trained Model object.
+    """
 
     with open(model_path + ".pkl", "wb") as f:
         pickle.dump(model, f)
@@ -323,7 +356,9 @@ def save_model(model_path, model):
 def get_features_for_transition(model, data, best_predictions, lengths,
                                 phase_1, phase_2):
 
-    '''
+    """
+    Return Top N features responsible for a state transition.
+
     For each time a transition (phase_1 -> phase_2) happens,
     compute the derivatives for each feature.
 
@@ -332,7 +367,18 @@ def get_features_for_transition(model, data, best_predictions, lengths,
 
     In practice, this inefficiency doesn't seem to be an issue in
     terms of runtime.
-    '''
+
+    Args:
+        model : HMM Model object
+        data (list): List of dataframes used to train HMM model.
+        best_predictions (list): List of list of predictions broken into respective lengths of dataframes.
+        lengths (list): List of lengths of dataframes.
+        phase_1 (str): Initial phase from where the transition is originating.
+        phase_2 (str): Final phase where the transition is reaching.
+
+    Returns:
+        _type_: _description_
+    """
 
     features = []
     for (i, datum) in enumerate(break_list_by_lengths(data, lengths)):
@@ -360,10 +406,17 @@ def get_difference_bt_means(model, phase_1, phase_2):
 
 
 def get_derivatives(X, model):
-    '''
+    """
     Compute the derivative d/dz_t p(s_t = k | z_{1:t}) for the entire
     forward lattice.
-    '''
+
+    Args:
+        X (dataframe): Data used to train HMM model
+        model: HMM model object
+
+    Returns:
+        derivates (list)
+    """
     derivatives = []
 
     log_frameprob = model._compute_log_likelihood(X)
@@ -410,10 +463,19 @@ def munge_data(hmm_model, model_pth, data_dir, cols, n_components,
 
 def characterize_transition_between_phases(model, data, best_predictions, cols,
                                            lengths, i, j):
-    '''
+    """
     Compute the average derivative for each feature, sort features by
     highest absolute value
-    '''
+
+    Args:
+        model : HMM model object
+        data (list): List of dataframes used to train HMM model.
+        best_predictions (list): List of list of predictions broken into respective lengths of dataframes.
+        lengths (list): List of lengths of dataframes.
+        cols (list): List of columns to be returned in sorted order
+        i (str): Initial phase from where the transition is originating.
+        j (str): Final phase where the transition is reaching.
+    """
     features = get_features_for_transition(model, data, best_predictions, lengths, i, j)
 
     if len(features) != 0:
@@ -429,8 +491,21 @@ def characterize_transition_between_phases(model, data, best_predictions, cols,
 
 
 def characterize_all_transitions(model, data, best_predictions, cols, lengths, phases, top_n):
+    """
+    Characterize phase transitions for all the phase permutations.
 
-    # phases = list(set(best_predictions))
+    Args:
+        model : HMM model object
+        data (list): List of dataframes used to train HMM model.
+        best_predictions (list): List of list of predictions broken into respective lengths of dataframes.
+        lengths (list): List of lengths of dataframes.
+        cols (list): List of columns to be returned in sorted order
+        phases (_type_): _description_
+        top_n (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
 
     transitions = {}
     

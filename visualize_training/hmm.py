@@ -7,7 +7,14 @@ from hmmlearn import hmm
 from tqdm import trange
 from visualize_training.utils import characterize_all_transitions
 
+
 class HMM():
+    """
+    The :class:`HMM` is one of the core modules of Visualization Training.
+    It is a wrapper that stores all the functionalities required to train,
+    process and infer from the HMM models. It contains methods for data preparation,
+    calculating average log likelood and feature importances to name a few.
+    """
 
     def __init__(self, max_components, cov_type, n_seeds, n_iter, seeds=None):
         self.max_components = max_components
@@ -17,7 +24,19 @@ class HMM():
         self.seeds = seeds
 
     def _make_hmm_data(self, data_dir, cols, sort, sort_col, first_n):
+        """Reads data files from `data_dir` containing specified `cols`
+        and `first_n` rows.
 
+        Args:
+            data_dir (str): Path to data files.
+            cols (list): List of columns to be returned.
+            sort (bool): Whether to sort the rows based on `sort_col` or not. 
+            sort_col (str): Column name based on which sorting needs to be done.
+            first_n (int): No of rows to be returned for each data file.
+
+        Returns:
+            dfs (list): List of dataframes
+        """
         print(data_dir)
         print(glob.glob(data_dir + "*.csv"))
         if sort:
@@ -42,6 +61,21 @@ class HMM():
         return dfs
 
     def _prep_train_data(self, dfs, test_size, seed):
+        """_summary_       
+        Prepares the training data into training and test set
+        from the given list of dataframes
+
+        Args:
+            dfs (list): List of dataframes for HMM model training
+            test_size (float): Size of test set as fraction of the total dataset
+            seed (int): Random Seed
+
+       Returns:
+            train_dfs (list): List of dataframes for training the HMM
+            test_dfs (list): List of dataframes for testing the HMM
+            train_data (array): All the dataframes in `train_dfs` stacked vertically
+            test_data (array): All the dataframes in `test_dfs` stacked vertically
+        """
 
         train_dfs, test_dfs = train_test_split(dfs, test_size=test_size,
                                                random_state=seed)
@@ -56,6 +90,25 @@ class HMM():
         return train_dfs, test_dfs, train_data, test_data
 
     def _train(self, n_components, train_data, test_data, train_dfs, test_dfs, best_score, best_model):
+        """
+        Method for training the HMM model for a given no of `n_components`.
+
+        Args:
+            n_components (float): No of components for the HMM model.
+            train_data (array): Training data for training HMM model.
+            test_data (array): Test data for testing HMM model.
+            train_dfs (list): List of dataframes containing training data.
+            test_dfs (list): List of dataframes containing testing data.
+            best_score (float): Best score out of all the models trained till this point.
+            best_model: Model corresponding to `best_score` till this point. 
+
+        Returns:
+            best_score (float): Best score out of all the models trained including the latest model.
+            best_model (array): Model corresponding to `best_score`.
+            aics_buf (list): List of AIC values for all the models trained in this run.
+            bics_buf (list): List of BIC values for all the models trained in this run.
+            scores_buf (list): List of Score values for all the models trained in this run.
+        """
 
         scores_buf = []
         aics_buf = []
@@ -93,6 +146,29 @@ class HMM():
     def get_avg_log_likelihood(self, data_dir, cols, sort=True,
                                sort_col="epoch", first_n=None, test_size=0.2,
                                seed=0):
+        """
+        Wrapper function which reads, prepares data for model training, trains all the models
+        for all the possible `n_components` values.
+
+        Args:
+            data_dir (str): Path to data files.
+            cols (list): List of columns to be returned.
+            sort (bool): Whether to sort the rows based on `sort_col` or not. Defaults to True.
+            sort_col (str): Column name based on sorting needs to be done. Defaults to "epoch".
+            first_n (int): No of rows to be returned for each data file. Defaults to None.
+            test_size (float, optional): Size of test set as fraction of the total dataset. Defaults to 0.2.
+            seed (int, optional): Random Seed. Defaults to 0.
+
+        Returns:
+            Dictionary containing 
+            - best_scores: List of best scores for all the components
+            - mean_scores: List of mean scores (average across all seeds) for all the components
+            - scores_stdev: List of std dev (calculated across all seeds) for all the components
+            - aics: List of mean AIC values (calculated across all seeds) for all the components
+            - bics: List of mean BIC values (calculated across all seeds) for all the components
+            - best_models: List of best models for all the components
+            - best_model: Best model out of all the models
+        """
         best_score = -np.inf
         best_model = None
         best_scores = []
