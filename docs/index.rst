@@ -24,9 +24,6 @@ Visualize Training documentation
    :caption: Documentation:
 
    api.md
-   source/hmm.md
-   source/train.md
-   source/visualize.md
 
 
 .. toctree::
