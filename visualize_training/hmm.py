@@ -160,14 +160,14 @@ class HMM():
             seed (int, optional): Random Seed. Defaults to 0.
 
         Returns:
-            Dictionary containing 
-            - best_scores: List of best scores for all the components
-            - mean_scores: List of mean scores (average across all seeds) for all the components
-            - scores_stdev: List of std dev (calculated across all seeds) for all the components
-            - aics: List of mean AIC values (calculated across all seeds) for all the components
-            - bics: List of mean BIC values (calculated across all seeds) for all the components
-            - best_models: List of best models for all the components
-            - best_model: Best model out of all the models
+            (Dict): Dictionary containing:
+                - best_scores (list): List of best scores for all the components
+                - mean_scores (list): List of mean scores (average across all seeds) for all the components
+                - scores_stdev (list): List of std dev (calculated across all seeds) for all the components
+                - aics (list): List of mean AIC values (calculated across all seeds) for all the components
+                - bics (list): List of mean BIC values (calculated across all seeds) for all the components
+                - best_models (list): List of best models for all the components
+                - best_model: Best model out of all the models
         """
         best_score = -np.inf
         best_model = None

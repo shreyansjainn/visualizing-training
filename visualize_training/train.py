@@ -15,6 +15,11 @@ from visualize_training.metrics import (
 
 
 class ModelManager:
+    """
+    The :class:`ModelManager` is one of the core modules of Visualization Training. 
+    Its the main class which handles all the model training, data collection, metrics calculation,
+    hookpoint configurations and metrics management.
+    """
     def __init__(self, model, train_dataloader, test_dataloader, full_dataloader, config):
         self.model = model
         self.train_dataloader = train_dataloader
@@ -89,6 +94,12 @@ class ModelManager:
         return hook_fn
 
     def attach_hooks(self, layers):
+        """
+        Method for configuring different hookpoints on specified `layers`.
+
+        Args:
+            layers (List): List of layers where hookpoints needs to be configured
+        """
         for layer_name in layers:
             for name, module in self.model.named_modules():
                 if layer_name == name:
@@ -112,16 +123,29 @@ class ModelManager:
                 self.weights_biases_cache.setdefault(name, []).append(cache_entry)
 
     def remove_hooks(self):
+        """
+        Remove all the hooks currently configured in the model.
+        """
         for hook in self.hooks:
             hook.remove()
 
     def clear_weights_biases_cache(self):
+        """
+        Clear the the current weights and biases cache.
+        """
         self.weights_biases_cache = {}
 
     def clear_metrics_cache(self):
+        """
+        Clear all the metrics cache.
+        """
         self.metrics_cache = []
 
     def train(self):
+        """
+        Primary Training function which consists of the training loop 
+        and some part of metrics collection
+        """
         self.steps = 0
         torch.manual_seed(self.config["seed"])
         self.model.train()
@@ -249,6 +273,10 @@ class ModelManager:
         return eval_loss, eval_accuracy
 
     def compute_metrics(self):
+        """
+        Computing the required metrics from the weights and biases cache. 
+        For the complete list of metrics, refer :doc:`source/metrics`
+        """
         # Initialize a dictionary to hold the metrics per step and epoch
         metrics_per_step = {}
 
@@ -462,6 +490,9 @@ class ModelManager:
         self.metrics_cache = list(metrics_per_step.values())
 
     def save_metrics(self):
+        """
+        Saving the metrics in a proper file directory structure.
+        """
         metrics_by_epoch = {}
         for metric in self.metrics_cache:
             epoch = metric["epoch"]
@@ -511,6 +542,9 @@ class ModelManager:
                 json.dump(filtered_metrics, f, indent=4)
 
     def train_and_save_metrics(self):
+        """
+        Wrapper function to train and save metrics in one go.
+        """
         print(f"Training with seed {self.config['seed']}")
         self.train()
         print("Computing metrics")

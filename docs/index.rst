@@ -23,9 +23,7 @@ Visualize Training documentation
    :maxdepth: 2
    :caption: Documentation:
 
-   source/hmm.md
-   source/train.md
-   source/visualize.md
+   api.md
 
 
 .. toctree::

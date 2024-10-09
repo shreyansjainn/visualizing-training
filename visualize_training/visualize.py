@@ -19,14 +19,11 @@ def visualize_hmm_loss(data, phase_col: str, epoch_col: str, loss_col: str,
     """Visualize HMM loss plot against the Epochs
 
     Args:
-         data (pd.DataFrame): input data containg training runs
-         phase_col (str): column name containing the HMM phases info
-         epoch_col (str): column name containing Epoch info
-         loss_col (str): column name for loss metric of the model
-                        hover_data (Dict): dictionary with column names as
-                        fields and bool
-         value against them for visibility in tooltip during hover
-
+        data (pd.DataFrame): input data containg training runs.
+        phase_col (str): column name containing the HMM phases info.
+        epoch_col (str): column name containing Epoch info.
+        loss_col (str): column name for loss metric of the model
+        hover_data (Dict): dictionary with column names as fields and bool value against them for visibility in tooltip during hover
     """
     data['color'] = data.apply(lambda x: hex[x['phases']-1 % len(hex)], axis=1)
     x = data[epoch_col]
@@ -70,10 +67,9 @@ def visualize_dag(transmat, node_hover_dict: Dict = None,
     """Visualize HMM State Transitions
 
     Args:
-         transmat (np.array): state transition matrix
-         hover_dict (Dict): phase wise list of important features to be shown 
-                            in tooltip on hover
-         HEX_VALUES (List): List containing HEX values of the color pallette
+        transmat (np.array): state transition matrix
+        hover_dict (Dict): phase wise list of important features to be shown in tooltip on hover
+        HEX_VALUES (List): List containing HEX values of the color pallette
     Output:
         Interactive Graph Visualization with a toggle menu on the right to
         control graph features
