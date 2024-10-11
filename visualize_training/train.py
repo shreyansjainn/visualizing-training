@@ -20,7 +20,7 @@ class ModelManager:
     Its the main class which handles all the model training, data collection, metrics calculation,
     hookpoint configurations and metrics management.
     """
-    def __init__(self, model, train_dataloader, test_dataloader, full_dataloader, config):
+    def __init__(self, model, train_dataloader, test_dataloader, config, full_dataloader = None):
         self.model = model
         self.train_dataloader = train_dataloader
         self.test_dataloader = test_dataloader
@@ -41,6 +41,9 @@ class ModelManager:
             )
         else:
             raise ValueError(f"Optimizer {self.config.get('optimizer')} not supported")
+        
+        if self.config.get("clock_pizza_metrics") and not self.full_dataloader:
+            raise ValueError("Full dataloader must be provided for clock_pizza_metrics")
 
         self.criterion = torch.nn.CrossEntropyLoss()
 
