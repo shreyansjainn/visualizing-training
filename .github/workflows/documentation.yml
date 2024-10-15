@@ -22,10 +22,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install sphinx sphinx_rtd_theme myst_parser sphinxcontrib-napoleon
 
-      - name: Apply patch for Sphinx Napoleon
-        run: |
-          cp sphinx_patch.py $(python -c "import site; print(site.getsitepackages()[0])")
-
       - name: Build documentation
         run: |
           cd docs  # adjust this path to where your Sphinx conf.py is located
