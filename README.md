@@ -4,7 +4,15 @@ Directly model training dynamics, then interpret the dynamics model.
 
 # Setup
 
-For using the package, directly clone the repo and install the package in editable mode
+### Installation
+
+Package can be installed using
+
+```bash
+pip install visualizing-training
+```
+
+For installing the package in editable mode, directly clone the repo and install the package.
 
 ```bash
 git clone https://github.com/michahu/visualizing-training.git
@@ -17,6 +25,7 @@ pip install -e .
 Below set of commands will walk you through the usage of the package, [demo_run](https://github.com/michahu/visualizing-training/blob/main/demo_run.ipynb) notebook can be referred for a notebook version of the same.
 
 ## Step 0: Config Setup.
+
 Setting up config required to collect training data and evaluation of the model
 
 ```python
@@ -78,7 +87,7 @@ for seed in range(n_seeds): # Saving the metrics for all the seeds
 
     train_loader, test_loader = get_dataloaders(train_bsz=train_bsz, test_bsz=test_bsz)
 
-    #Initialize the ModelManager class which will take care of training and collecting the metrics 
+    #Initialize the ModelManager class which will take care of training and collecting the metrics
     model_manager = ModelManager(model,train_loader,test_loader, config)
 
     # Specify the layers where hooks needs to be attached
@@ -101,7 +110,7 @@ training_run_json_to_csv(config['run_output_dir'], is_transformer=True, has_loss
 
 ## Step 4: Train HMM.
 
-Model selection computes the AIC-BIC-log-likelihood curves for varying number of hidden states in the HMM and saves out the best model for each number of hidden states. 
+Model selection computes the AIC-BIC-log-likelihood curves for varying number of hidden states in the HMM and saves out the best model for each number of hidden states.
 
 ```python
 from src.hmm import HMM
@@ -117,6 +126,7 @@ data_dir = 'modular_demo_run/'
 
 hmm_output = hmm_model.get_avg_log_likelihood(data_dir, cols)
 ```
+
 ## Step 5: HMM Model Selection
 
 Visualizing average log-likelihood, along with AIC and BIC helps with the model selection for the different HMM models we have trained. Currently we are selecting the HMM model with the lowest BIC.
@@ -151,7 +161,6 @@ phases = list(set(hmm_model.best_model.predict(data, lengths=lengths)))
 state_transitions = hmm_model.feature_importance(cols, data, best_predictions,phases,lengths) # dictionary storing state transitions
 ```
 
-
 ## Step 8: Visualizing State Transitions
 
 Visualizing state transitions using a DAG visualization which allows the user to interact with it for deeper insight into the training dynamics.
@@ -167,6 +176,7 @@ visualize_dag(best_model_transmat, edge_hover_dict = state_transitions)
 # Citation
 
 Thank you for your interest in our work! If you use this repo, please cite:
+
 ```
 @article{
 hu2023latent,
