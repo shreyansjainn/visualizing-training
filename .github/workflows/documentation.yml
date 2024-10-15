@@ -24,13 +24,12 @@ jobs:
 
       - name: Apply patch for Sphinx Napoleon
         run: |
-          NAPOLEON_FILE=$(python -c "import sphinxcontrib.napoleon as m; print(m.__file__)")
-          sed -i 's/from collections import OrderedDict, namedtuple, Callable/from collections import OrderedDict, namedtuple\nfrom collections.abc import Callable/' $NAPOLEON_FILE
+          cp sphinx_patch.py $(python -c "import site; print(site.getsitepackages()[0])")
 
       - name: Build documentation
         run: |
           cd docs  # adjust this path to where your Sphinx conf.py is located
-          make html
+          PYTHONPATH="$PYTHONPATH:$(python -c "import site; print(site.getsitepackages()[0])")" sphinx-build -b html . _build/html
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
