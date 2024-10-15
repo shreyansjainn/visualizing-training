@@ -1,6 +1,6 @@
 # [Latent State Models of Training Dynamics](https://arxiv.org/abs/2308.09543)
 
-Directly model training dynamics, then interpret the dynamics model.
+Directly model training dynamics, then interpret the dynamics model
 
 # Setup
 
