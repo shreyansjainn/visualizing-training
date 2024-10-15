@@ -22,10 +22,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install sphinx sphinx_rtd_theme myst_parser sphinxcontrib-napoleon
 
-      # - name: Apply patch for Sphinx Napoleon
-      #   run: |
-      #     NAPOLEON_FILE=$(python -c "import sphinxcontrib.napoleon as m; print(m.__file__)")
-      #     sed -i 's/from collections import OrderedDict, namedtuple, Callable/from collections import OrderedDict, namedtuple\nfrom collections.abc import Callable/' $NAPOLEON_FILE
+      - name: Apply patch for Sphinx Napoleon
+        run: |
+          NAPOLEON_FILE=$(python -c "import sphinxcontrib.napoleon as m; print(m.__file__)")
+          sed -i 's/from collections import OrderedDict, namedtuple, Callable/from collections import OrderedDict, namedtuple\nfrom collections.abc import Callable/' $NAPOLEON_FILE
 
       - name: Build documentation
         run: |
