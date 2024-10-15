@@ -10,6 +10,7 @@ import sys
 from types import ModuleType
 sys.path.insert(0, os.path.abspath("."))
 sys.path.insert(0, os.path.abspath('../'))
+sys.path.insert(0, os.path.abspath('_ext'))
 
 # Create a fake collections module
 collections = ModuleType('collections')
@@ -34,7 +35,7 @@ release = '1.0'
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ['myst_parser', "sphinx.ext.autodoc",'sphinxcontrib.napoleon','sphinx.ext.doctest']
+extensions = ['myst_parser', "sphinx.ext.autodoc",'collection_patch','sphinxcontrib.napoleon','sphinx.ext.doctest']
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']

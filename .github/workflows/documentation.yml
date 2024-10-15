@@ -22,10 +22,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install sphinx sphinx_rtd_theme myst_parser sphinxcontrib-napoleon
 
+      - name: Prepare custom extension
+        run: |
+          mkdir -p docs/_ext
+          cp collection_patch.py docs/_ext/
+
       - name: Build documentation
         run: |
           cd docs  # adjust this path to where your Sphinx conf.py is located
-          PYTHONPATH="$PYTHONPATH:$(python -c "import site; print(site.getsitepackages()[0])")" sphinx-build -b html . _build/html
+          sphinx-build -b html . _build/html
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
