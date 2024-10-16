@@ -34,3 +34,5 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs/_build/html # adjust this path to your Sphinx output directory
+          destination_dir: docs # This will deploy to a 'docs' folder in the gh-pages branch
+          keep_files: true # This ensures that files not in publish_dir are kept
