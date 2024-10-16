@@ -12,15 +12,15 @@ from collections import abc
 sys.path.insert(0, os.path.abspath("."))
 sys.path.insert(0, os.path.abspath('../'))
 
-class PatchedCollections(types.ModuleType):
-    def __getattr__(self, name):
-        if name == 'Callable':
-            return abc.Callable
-        if name == 'deque':
-            return abc.deque
-        return getattr(abc, name)
+# class PatchedCollections(types.ModuleType):
+#     def __getattr__(self, name):
+#         if name == 'Callable':
+#             return abc.Callable
+#         if name == 'deque':
+#             return abc.deque
+#         return getattr(abc, name)
 
-sys.modules['collections'] = PatchedCollections('collections')
+# sys.modules['collections'] = PatchedCollections('collections')
 
 project = 'Visualize Training'
 copyright = '2024, shreyans jain'
