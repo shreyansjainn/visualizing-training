@@ -20,7 +20,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -U sphinx==7.4.7 sphinx_rtd_theme==2.0.0 myst_parser==3.0.1 sphinxcontrib-napoleon==0.7
+          pip install -U sphinx==7.4.7 sphinx_rtd_theme==2.0.0 myst_parser==3.0.1 sphinxcontrib-napoleon==0.7 furo
           pip freeze | grep sphinx
 
       - name: Build documentation
