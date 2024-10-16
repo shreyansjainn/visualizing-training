@@ -7,25 +7,20 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 import os
 import sys
-from types import ModuleType
+import types
+from collections import abc
 sys.path.insert(0, os.path.abspath("."))
 sys.path.insert(0, os.path.abspath('../'))
-sys.path.insert(0, os.path.abspath('_ext'))
 
-# Create a fake collections module
-collections = ModuleType('collections')
-sys.modules['collections'] = collections
+class PatchedCollections(types.ModuleType):
+    def __getattr__(self, name):
+        if name == 'Callable':
+            return abc.Callable
+        if name == 'deque':
+            return abc.deque
+        return getattr(abc, name)
 
-# Import the real collections
-import collections as real_collections
-
-# Add everything from the real collections to our fake one
-for attr in dir(real_collections):
-    setattr(collections, attr, getattr(real_collections, attr))
-
-# Add Callable from collections.abc
-from collections.abc import Callable
-collections.Callable = Callable
+sys.modules['collections'] = PatchedCollections('collections')
 
 project = 'Visualize Training'
 copyright = '2024, shreyans jain'
@@ -35,7 +30,7 @@ release = '1.0'
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ['collection_patch','myst_parser', "sphinx.ext.autodoc",'sphinxcontrib.napoleon','sphinx.ext.doctest']
+extensions = ['myst_parser', "sphinx.ext.autodoc",'sphinxcontrib.napoleon','sphinx.ext.doctest']
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']

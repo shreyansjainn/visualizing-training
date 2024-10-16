@@ -22,11 +22,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install sphinx sphinx_rtd_theme myst_parser sphinxcontrib-napoleon
 
-      - name: Prepare custom extension
-        run: |
-          mkdir -p docs/_ext
-          cp collection_patch.py docs/_ext/
-
       - name: Build documentation
         run: |
           cd docs  # adjust this path to where your Sphinx conf.py is located
