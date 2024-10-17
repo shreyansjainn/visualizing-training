@@ -30,7 +30,7 @@ release = '1.0'
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ['myst_parser', "sphinx.ext.autodoc",'sphinxcontrib.napoleon','sphinx.ext.doctest']
+extensions = ['myst_parser', "sphinx.ext.autodoc",'sphinx.ext.napoleon','sphinx.ext.doctest']
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
