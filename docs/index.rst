@@ -23,8 +23,7 @@ Visualize Training documentation
    :maxdepth: 2
    :caption: Documentation:
 
-   api.md
-
+   api/api.md
 
 .. toctree::
    :maxdepth: 2
