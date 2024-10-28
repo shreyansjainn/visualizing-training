@@ -1,11 +1,11 @@
 ## Resources
 
-Mechanistic Interpretability is a new and evolving field, so collating all the resources useful for using the package and work on open problems.
+Interpretability is a new and evolving field, so collating all the resources useful for using the package and work on open problems.
 
-### Transformers
+<!-- ### Transformers
 
 - [The Illustrated Transformer by Jay Alammar](https://jalammar.github.io/illustrated-transformer/)
-- [The Annotated Transformer](https://nlp.seas.harvard.edu/2018/04/03/attention.html)
+- [The Annotated Transformer](https://nlp.seas.harvard.edu/2018/04/03/attention.html) -->
 
 ### Hidden Markov Models
 
