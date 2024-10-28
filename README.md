@@ -61,7 +61,8 @@ config = {
     "train_bsz": train_bsz,
     "test_bsz": test_bsz,
     "n_heads": n_heads,
-    "dataset_name": dataset_name
+    "dataset_name": dataset_name,
+    "clock_pizza_metrics": False # Set to True if you want to collect clock_pizza metrics - gradient symmetricity and distance irrelevance
 }
 ```
 
@@ -105,7 +106,7 @@ Take the stats computed in step 1 and organize them into CSVs suitable for train
 ```python
 from src.utils import training_run_json_to_csv
 
-training_run_json_to_csv(config['run_output_dir'], is_transformer=True, has_loss=False, lr=lr, optimizer=config['optimizer'], init_scaling=config['init_scaling'], input_dir=config['run_output_dir'], n_seeds=n_seeds)
+training_run_json_to_csv(config['run_output_dir'], is_transformer=True, has_loss=False, lr=lr, optimizer=config['optimizer'], init_scaling=config['init_scaling'], input_dir=config['run_output_dir'], n_seeds=n_seeds, clock_pizza_metrics=config['clock_pizza_metrics'])
 ```
 
 ## Step 4: Train HMM.
