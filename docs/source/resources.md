@@ -1,4 +1,4 @@
-## Resources
+# Resources
 
 Interpretability is a new and evolving field, so collating all the resources useful for using the package and work on open problems.
 

@@ -1,4 +1,4 @@
-## Visualize
+# Visualize
 
 - `visualize_hmm_loss(data: pd.DataFrame, phase_col: str, epoch_col: str, loss_col: str, hover_data: dict=None)`
 

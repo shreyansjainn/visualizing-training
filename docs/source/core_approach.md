@@ -1,4 +1,4 @@
-## Core Approach
+# Core Approach
 
 The core idea in our approach for Training Dynamics research is the existence of **Latent States** i.e. Hidden states which the model navigates through during the training process and studying these latent states can help us draw insights about the training dynamics a model is following for choosing different generalization strategies.
 
