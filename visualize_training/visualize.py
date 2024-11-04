@@ -79,7 +79,7 @@ def visualize_dag(transmat, node_hover_dict: Dict = None,
     dot = nx.DiGraph(directed=True)
     for i in range(n):
         for j in range(n):
-            if np.round(transmat[i][j], 2) > 0:
+            if np.round(transmat[i][j], 3) > 0:
                 if node_hover_dict:
                     dot.add_node(i, label=str(i+1), color=hex[i % len(hex)],
                                  size=20, hover=node_hover_dict[str(i+1)],

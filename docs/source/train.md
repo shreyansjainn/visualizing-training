@@ -1,4 +1,4 @@
-## Train
+# Train
 
 `class ModelManager(model, train_dataloader, test_dataloader, config: Dict)`
 
@@ -7,7 +7,6 @@
     * `train_dataloader`: The dataloader for the training data.
     * `test_dataloader`: The dataloader for the test data.
     * `config`: A dictionary for the training configuration
-
 
 - `attach_hooks(layernames: List[str])`
 

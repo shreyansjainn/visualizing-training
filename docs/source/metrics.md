@@ -1,4 +1,4 @@
-## Metrics
+# Metrics
 
 List of metrics currently considered by the package for a hook point.
 
