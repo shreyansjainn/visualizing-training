@@ -14,7 +14,7 @@ Visualize Training documentation
    :caption: Introduction:
 
    source/getting_started.md
-   source/core_approach.md
+   source/step_by_step.md
    source/resources.md
    source/metrics.md
 
