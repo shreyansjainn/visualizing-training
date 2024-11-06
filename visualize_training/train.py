@@ -1,560 +1,239 @@
+import torch
 import json
 import os
+import csv
+import numpy as np
 
-import evaluate
-import torch
-from accelerate import Accelerator
-from visualize_training.metrics import (
-    distance_irrelevance,
-    get_distribution_stats,
-    get_matrix_metrics,
-    get_tensor_metrics,
-    gradient_symmetricity,
-)
-
-
+from visualize_training.metrics import calculate_metrics
 
 class ModelManager:
-    """
-    The :class:`ModelManager` is one of the core modules of Visualization Training. 
-    Its the main class which handles all the model training, data collection, metrics calculation,
-    hookpoint configurations and metrics management.
-    """
-    def __init__(self, model, train_dataloader, test_dataloader, config, full_dataloader = None):
-        self.model = model
-        self.train_dataloader = train_dataloader
-        self.test_dataloader = test_dataloader
-        self.full_dataloader = full_dataloader
-        self.config = config
-        self.accelerator = None
-
-        if self.config.get("optimizer") == "adamw":
-            self.optimizer = torch.optim.AdamW(
-                self.model.parameters(),
-                lr=self.config.get("lr", 1e-3),
-                weight_decay=self.config.get("weight_decay"),
-                betas=(0.9, 0.98),
-            )
-        elif self.config.get("optimizer") == "sgd":
-            self.optimizer = torch.optim.SGD(
-                self.model.parameters(), lr=self.config.get("lr", 1e-3), weight_decay=self.config.get("weight_decay")
-            )
-        else:
-            raise ValueError(f"Optimizer {self.config.get('optimizer')} not supported")
-        
-        if self.config.get("clock_pizza_metrics") and not self.full_dataloader:
-            raise ValueError("Full dataloader must be provided for clock_pizza_metrics")
-
-        self.criterion = torch.nn.CrossEntropyLoss()
-
-        if "init_scaling" in self.config:
-            scaling_factor = self.config["init_scaling"]
-            with torch.no_grad():
-                for param in self.model.parameters():
-                    param.data *= scaling_factor
-
-        if config.get("use_accelerator", True):
-            self.accelerator = Accelerator(cpu=config.get("cpu", False))
-            self.model, self.optimizer, self.train_dataloader, self.test_dataloader = self.accelerator.prepare(
-                self.model, self.optimizer, self.train_dataloader, self.test_dataloader
-            )
-
-        self.save_path = os.path.join(
-            self.config["run_output_dir"],
-            f'lr{self.config["lr"]}_{self.config["optimizer"]}_seed{self.config["seed"]}_scaling{self.config["init_scaling"]}', 
-        )
-        if not os.path.exists(self.save_path):
-            os.makedirs(self.save_path)
-
-        self._load_eval()
-
-        if not config.get("is_transformer"):
-            self._set_miscs()
-
-        self.hooks = []
-        self.metrics_cache = []
-        self.weights_biases_cache = {}
-        self.training_metrics = {"loss": [], "accuracy": [], "grad_sym": [], "dist_irr": []}
-
-    def _load_eval(self):
-        self.train_accuracy = evaluate.load(
-            "accuracy", experiment_id=f"{self.config['dataset_name']}{self.config['seed']}", keep_in_memory=True
-        )
-        self.test_accuracy = evaluate.load(
-            "accuracy", experiment_id=f"{self.config['dataset_name']}{self.config['seed']}", keep_in_memory=True
-        )
-
-    def _set_miscs(self):
-        if self.config["dataset_name"] == "mnist":
-            self.num_classes = 10
-        else:
-            self.num_classes = 100
-
-    def make_hook_function(self, name):
-        def hook_fn(module, input, output):
-            self._cache_weights_biases(name, module)
-
-        return hook_fn
-
-    def attach_hooks(self, layers):
+    def __init__(self, model, output_dir, layer_names= None, interval=100, standard_metrics=None, custom_metrics=None):
         """
-        Method for configuring different hookpoints on specified `layers`.
+        Initialize the ModelManager.
 
         Args:
-            layers (List): List of layers where hookpoints needs to be configured
+            model (torch.nn.Module): The model to analyze.
+            layer_names (list): List of layer names to log metrics from.
+            output_dir (str): Directory to save logged data.
+            interval (int): Interval for logging.
+            standard_metrics (list): List of standard metric names to calculate.
+            custom_metrics (dict): Dictionary of custom metric functions.
         """
-        for layer_name in layers:
-            for name, module in self.model.named_modules():
-                if layer_name == name:
-                    hook_fn = self.make_hook_function(name)
-                    self.hooks.append(module.register_forward_hook(hook_fn))
-                    self.weights_biases_cache[name] = []
+        self.model = model
+        self.layer_names = layer_names
+        self.output_dir = output_dir
+        self.interval = interval
+        self.standard_metrics = standard_metrics or []
+        self.custom_metrics = custom_metrics or {}
+        self.current_data = {}
+        self.epoch = 0
 
-    def _cache_weights_biases(self, name, module):
-        if self.epoch % self.config["eval_every"] == 0:
-            # Initialize cache entry with epoch, steps, and layer name
-            cache_entry = {"epoch": self.epoch, "steps": self.steps, "layer_name": name}
+        # Prepare output directory
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Validate specified layers
+        self.validated_layers = self._validate_layers()
+        
+        # Register hooks on validated layers
+        self.hooks = []
+        if self.validated_layers:
+            for name, layer in self.validated_layers.items():
+                hook = layer.register_forward_hook(self._hook_fn(name))
+                self.hooks.append(hook)
 
-            # Iterate through all named parameters of the module
-            for param_name, param_value in module.named_parameters():
-                cache_entry[param_name] = param_value.clone().detach().cpu().numpy()
-
-            # Check if we already have an entry for this layer and step
-            if not (
-                self.weights_biases_cache.get(name) and self.weights_biases_cache[name][-1]["steps"] == self.steps
-            ):
-                self.weights_biases_cache.setdefault(name, []).append(cache_entry)
-
-    def remove_hooks(self):
+    def _validate_layers(self):
         """
-        Remove all the hooks currently configured in the model.
+        Validate that user-specified layers (or all layers if none specified) exist in the model, 
+        and extract all trainable parameters.
+
+        Returns:
+            dict: Dictionary with layer names as keys and their layer objects as values.
+
+        Raises:
+            ValueError: If any specified layer does not exist in the model.
         """
-        for hook in self.hooks:
-            hook.remove()
+        # If no layer names are provided, list all available layers with trainable parameters
+        if self.layer_names is None:
+            available_layers = {name: module for name, module in self.model.named_modules()
+                                if any(p.requires_grad for p in module.parameters(recurse=False))}
 
-    def clear_weights_biases_cache(self):
-        """
-        Clear the the current weights and biases cache.
-        """
-        self.weights_biases_cache = {}
+            print("No layer names were specified.")
+            print("Available layers with trainable parameters in the model:")
+            for layer, layer_type in available_layers.items():
+                print(f"  - {layer} ({layer_type.__class__.__name__})")
+            
+            print("\nPlease specify the layers you want by referring to the model architecture.")
+            return None  # Exit without proceeding, prompting the user to specify layers
 
-    def clear_metrics_cache(self):
-        """
-        Clear all the metrics cache.
-        """
-        self.metrics_cache = []
+        validated_layers = {}
+        invalid_layers = []
 
-    def train(self):
-        """
-        Primary Training function which consists of the training loop 
-        and some part of metrics collection
-        """
-        self.steps = 0
-        torch.manual_seed(self.config["seed"])
-        self.model.train()
+        for layer_name in self.layer_names:
+            # Split layer name by dots to navigate nested modules
+            submodules = layer_name.split('.')
+            current_module = self.model
 
-        for epoch in range(self.config["num_epochs"]):
-            self.epoch = epoch
-            for batch in self.train_dataloader:
-                x, y = batch
+            try:
+                # Traverse through submodules to get to the target layer
+                for submodule_name in submodules:
+                    current_module = getattr(current_module, submodule_name)
 
-                output = self.model(x)[:, -1, :] if self.config.get("is_transformer") else self.model(x)
-                loss = self.criterion(output, y)
+                validated_layers[layer_name] = current_module  # Store the actual layer object
+            except AttributeError:
+                invalid_layers.append(layer_name)
 
-                if self.config.get("clip_grad"):
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.config["lr"] * 10)
-
-                loss.backward()
-                self.optimizer.step()
-                # self.scheduler.step()
-                self.optimizer.zero_grad()
-
-                train_loss = loss.detach().cpu().item()
-
-                predictions = torch.argmax(output, dim=1)
-                self.train_accuracy.add_batch(predictions=predictions, references=y)
-
-                self.steps += 1
-
-                if self.epoch % self.config["eval_every"] == 0:
-                    eval_loss, eval_accuracy = self._evaluate()
-                    train_accuracy_metric = self.train_accuracy.compute()
-
-                    if self.config.get("clock_pizza_metrics"):
-                        # calculation for gradient symmetricity
-                        mod_no = self.config["C"]
-
-                        # Clone the current model
-                        model_clone_for_grad_sym = self.model.__class__(
-                            num_layers=self.config.get("n_layers", 1),
-                            num_heads=self.config["n_heads"],
-                            d_model=self.config["d_model"],
-                            d_head=self.config.get("d_head", self.config["d_model"] // self.config["n_heads"]),
-                            attn_coeff=self.config["attn_coeff"],
-                            d_vocab=self.config["C"],
-                            act_type=self.config.get("act_fn", "relu"),
-                            n_ctx=self.config["n_ctx"],
-                            use_ln=self.config["use_ln"],
-                        )
-                        model_clone_for_grad_sym.load_state_dict(self.model.state_dict())
-
-                        grad_sym = gradient_symmetricity(model=model_clone_for_grad_sym, mod_no=mod_no)
-
-                        self.training_metrics["grad_sym"].append(
-                            {"epoch": epoch, "steps": self.steps, "grad_sym": grad_sym}
-                        )
-
-                        model_clone_for_dist_irr = self.model.__class__(
-                            num_layers=self.config.get("n_layers", 1),
-                            num_heads=self.config["n_heads"],
-                            d_model=self.config["d_model"],
-                            d_head=self.config.get("d_head", self.config["d_model"] // self.config["n_heads"]),
-                            attn_coeff=self.config["attn_coeff"],
-                            d_vocab=self.config["C"],
-                            act_type=self.config.get("act_fn", "relu"),
-                            n_ctx=self.config["n_ctx"],
-                            use_ln=self.config["use_ln"],
-                        )
-                        model_clone_for_dist_irr.load_state_dict(self.model.state_dict())
-                        dist_irr = distance_irrelevance(
-                            model=model_clone_for_dist_irr, dataloader=self.full_dataloader, mod_no=mod_no
-                        )
-
-                        self.training_metrics["dist_irr"].append(
-                            {
-                                "epoch": epoch,
-                                "steps": self.steps,
-                                "dist_irr": dist_irr,
-                            }
-                        )
-
-
-                    self.training_metrics["loss"].append(
-                        {"epoch": epoch, "steps": self.steps, "train_loss": train_loss, "eval_loss": eval_loss}
-                    )
-                    self.training_metrics["accuracy"].append(
-                        {
-                            "epoch": epoch,
-                            "steps": self.steps,
-                            "train_accuracy": train_accuracy_metric.get("accuracy"),
-                            "eval_accuracy": eval_accuracy.get("accuracy"),
-                        }
-                    )
-
-                    self.model.train()
-
-            print(
-                f"Epoch {epoch}, Train Loss: {train_loss}, Eval Loss: {eval_loss}, "
-                f"Train Accuracy: {train_accuracy_metric.get('accuracy')}, Eval Accuracy: {eval_accuracy.get('accuracy')}" 
+        # Raise an error if any layers were not found, with detailed messages
+        if invalid_layers:
+            available_layers = ", ".join(
+                f"{name} ({type(module).__name__})" for name, module in self.model.named_modules()
+                if any(p.requires_grad for p in module.parameters(recurse=False))
+            )
+            raise ValueError(
+                f"The following layers were not found in the model: {', '.join(invalid_layers)}. "
+                f"Available layers with trainable parameters: {available_layers}."
             )
 
-        if self.accelerator is not None:
-            self.accelerator.wait_for_everyone()
-            model_path = os.path.join(self.save_path, "model.pt")
-            self.accelerator.save(self.model.state_dict(), model_path)
-        else:
-            model_path = os.path.join(self.save_path, "model.pt")
-            torch.save(self.model.state_dict(), model_path)
+        return validated_layers
 
-    def _evaluate(self):
-        self.model.eval()
-        eval_loss = 0.0
-        eval_steps = 0
-        with torch.no_grad():
-            for batch in self.test_dataloader:
-                x, y = batch
-                output = self.model(x)[:, -1, :] if self.config.get("is_transformer") else self.model(x)
-                loss = self.criterion(output, y)  # Use class indices instead of one-hot
-                eval_loss += loss.item()
+    def _hook_fn(self, layer_name):
+        def fn(module, input, output):
+            """Cache weights and biases of the specified module."""
+            cache_entry = {"epoch": self.epoch, "layer_name": layer_name}
 
-                predictions = torch.argmax(output, dim=1)
-                self.test_accuracy.add_batch(predictions=predictions, references=y)
-                eval_steps += 1
-
-        eval_loss /= eval_steps
-        eval_accuracy = self.test_accuracy.compute()
-        return eval_loss, eval_accuracy
-
-    def compute_metrics(self):
-        """
-        Computing the required metrics from the weights and biases cache. 
-        For the complete list of metrics, refer :doc:`source/metrics`
-        """
-        # Initialize a dictionary to hold the metrics per step and epoch
-        metrics_per_step = {}
-
-        # Temporary storage for global weight and bias statistics
-        aggregated_weights = {}
-        aggregated_biases = {}
-
-        # Aggregate layer-specific metrics and prepare for global stats calculation
-        for layer_name, data_list in self.weights_biases_cache.items():
-            for data in data_list:
-                step = data["steps"]
-                epoch = data["epoch"]
-                key = (step, epoch)
-
-                # Ensure the structure is initialized for each unique step and epoch
-                # Find corresponding training and evaluation data
-                train_data = next(
-                    (
-                        item
-                        for item in self.training_metrics["loss"]
-                        if item["steps"] == step and item["epoch"] == epoch
-                    ),
-                    None,
-                )
-                accuracy_data = next(
-                    (
-                        item
-                        for item in self.training_metrics["accuracy"]
-                        if item["steps"] == step and item["epoch"] == epoch
-                    ),
-                    None,
-                )
+            # Cache all named parameters generically
+            for param_name, param_value in module.named_parameters(recurse=False):
+                cache_entry[param_name] = param_value.clone().detach().cpu().numpy().tolist()
                 
-                grad_sym_data = next(
-                    (
-                        item
-                        for item in self.training_metrics["grad_sym"]
-                        if item["steps"] == step and item["epoch"] == epoch
-                    ),
-                    None,
-                )
-                
-                dist_irr_data = next(
-                    (
-                        item
-                        for item in self.training_metrics["dist_irr"]
-                        if item["steps"] == step and item["epoch"] == epoch
-                    ),
-                    None,
-                )
+            # Store cache entry in current_data
+            self.current_data[layer_name] = cache_entry
+        return fn
 
-                if self.config.get("clock_pizza_metrics"):
-                    grad_sym_data = next(
-                        (
-                            item
-                            for item in self.training_metrics["grad_sym"]
-                            if item["steps"] == step and item["epoch"] == epoch
-                        ),
-                        None,
-                    )
+    def start_epoch(self, epoch):
+        """Set the current epoch and initialize logging data."""
+        self.epoch = epoch
+        self.current_data.clear()  # Clear previous epoch data to prevent conflicts
 
-                    dist_irr_data = next(
-                        (
-                            item
-                            for item in self.training_metrics["dist_irr"]
-                            if item["steps"] == step and item["epoch"] == epoch
-                        ),
-                        None,
-                    )
+    def save_epoch_data(self, seed, train_loss=None, train_accuracy=None, eval_loss=None, eval_accuracy=None):
+        """Save logged data at the end of each epoch."""
+        if self.epoch % self.interval == 0:
+            seed_dir = os.path.join(self.output_dir, f"seed_{seed}")
+            os.makedirs(seed_dir, exist_ok=True)
+            
+            data_output = {
+                'epoch': self.epoch,
+                'seed': seed,
+                'layers': self.current_data,
+            }
+            if train_loss is not None:
+                data_output['train_loss'] = train_loss
+            if train_accuracy is not None:
+                data_output['train_accuracy'] = train_accuracy
+            if eval_loss is not None:
+                data_output['eval_loss'] = eval_loss
+            if eval_accuracy is not None:
+                data_output['eval_accuracy'] = eval_accuracy
 
-                if self.config.get("is_transformer"):
-                    if key not in metrics_per_step:
-                        metrics_per_step[key] = {
-                            "step": step,
-                            "epoch": epoch,
-                            "k": [],
-                            "q": [],
-                            "v": [],
-                            "in_proj": [],
-                            "ffn_in": [],
-                            "ffn_out": [],
-                            "train_loss": train_data["train_loss"] if train_data else None,
-                            "eval_loss": train_data["eval_loss"] if train_data else None,
-                            "train_accuracy": accuracy_data["train_accuracy"] if accuracy_data else None,
-                            "eval_accuracy": accuracy_data["eval_accuracy"] if accuracy_data else None,
-                            "grad_sym": grad_sym_data['grad_sym'] if grad_sym_data else None,
-                            "dist_irr": dist_irr_data['dist_irr'] if dist_irr_data else None,
-                        }
+            epoch_file = os.path.join(seed_dir, f"epoch_{self.epoch}.json")
+            with open(epoch_file, 'w') as f:
+                json.dump(data_output, f, indent=2)
 
-                        if self.config.get("clock_pizza_metrics"):
-                            metrics_per_step[key]["grad_sym"] = grad_sym_data["grad_sym"] if grad_sym_data else None
-                            metrics_per_step[key]["dist_irr"] = dist_irr_data["dist_irr"] if dist_irr_data else None
+    def calculate_metrics_post_training(self):
+        for seed_dir in os.listdir(self.output_dir):
+            seed_path = os.path.join(self.output_dir, seed_dir)
+            if not os.path.isdir(seed_path):
+                continue
 
-                        aggregated_weights[key] = []
-                        aggregated_biases[key] = []
+            csv_file_path = os.path.join(self.output_dir, f"metrics_summary_{seed_dir}.csv")
 
-                    if "W_K" in data:
-                        k = torch.from_numpy(data["W_K"])
-                        metrics_data = [get_matrix_metrics(k[i, :, :]) for i in range(self.config.get("n_heads"))]
+            # Initialize buffers for metrics
+            buf = {
+                "epoch": [], "l1": [], "l2": [], "code_sparsity": [], "trace": [], "spectral": [],
+                "computational_sparsity": [], "mean_singular_value": [], "var_singular_value": [],
+                "mean_w": [], "median_w": [], "var_w": [], "mean_b": [], "median_b": [], "var_b": [],
+                "train_loss": [], "eval_loss": [], "train_accuracy": [], "eval_accuracy": []
+            }
 
-                        metrics_per_step[key]["k"].append({"0": metrics_data})
+            for epoch_file in sorted(
+                    [f for f in os.listdir(seed_path) if f.startswith("epoch") and f.endswith(".json")],
+                    key=lambda x: int(x.split('_')[1].split('.')[0])
+                ):
+                epoch_data_path = os.path.join(seed_path, epoch_file)
+                if not epoch_file.endswith(".json"):
+                    continue
 
-                        aggregated_weights[key].append(k.view(-1))
+                with open(epoch_data_path, 'r') as f:
+                    epoch_data = json.load(f)
 
-                    if "W_Q" in data:
-                        q = torch.from_numpy(data["W_Q"])
-                        metrics_data = [get_matrix_metrics(q[i, :, :]) for i in range(self.config.get("n_heads"))]
+                # Aggregation buffers
+                l1_buf, l2_buf, trace_buf, spectral_buf, code_sparsity_buf = [], [], [], [], []
+                computational_sparsity_buf, mean_lambda_buf, variance_lambda_buf = [], [], []
+                aggregated_weights, aggregated_biases = [], []
 
-                        metrics_per_step[key]["q"].append({"0": metrics_data})
+                # Gather metrics for each layer
+                for layer_name, params in epoch_data['layers'].items():
+                    for param_name, param_data in params.items():
+                        if param_name in ["epoch", "layer_name"]:
+                            continue
 
-                        aggregated_weights[key].append(q.view(-1))
+                        # Convert param_data to tensor
+                        param_tensor = torch.tensor(param_data, dtype=torch.float32)
 
-                    if "W_V" in data:
-                        v = torch.from_numpy(data["W_V"])
-                        metrics_data = [get_matrix_metrics(v[i, :, :]) for i in range(self.config.get("n_heads"))]
+                        if "weight" in param_name or param_name.startswith("W_") or param_name.startswith("w_"):
+                            metrics = calculate_metrics(param_tensor)
+                            
+                            # Append layer metrics to corresponding buffers
+                            l1_buf.append(metrics["l1"])
+                            l2_buf.append(metrics["l2"])
+                            trace_buf.append(metrics["trace"])
+                            spectral_buf.append(metrics["spectral"])
+                            code_sparsity_buf.append(metrics["code_sparsity"])
+                            computational_sparsity_buf.append(metrics["computational_sparsity"])
+                            mean_lambda_buf.append(metrics["mean_singular_value"])
+                            variance_lambda_buf.append(metrics["var_singular_value"])
 
-                        metrics_per_step[key]["v"].append({"0": metrics_data})
+                            aggregated_weights.append(param_tensor.flatten())
+                        elif "bias" in param_name or param_name.startswith("B_") or param_name.startswith("b_"):
+                            aggregated_biases.append(param_tensor.flatten())
 
-                        aggregated_weights[key].append(v.view(-1))
+                # Aggregate layer metrics and add to buffer
+                buf["epoch"].append(epoch_data['epoch'])
+                buf["l1"].append(np.mean(l1_buf))
+                buf["l2"].append(np.mean(l2_buf))
+                buf["trace"].append(np.mean(trace_buf))
+                buf["spectral"].append(np.mean(spectral_buf))
+                buf["code_sparsity"].append(np.mean(code_sparsity_buf))
+                buf["computational_sparsity"].append(np.mean(computational_sparsity_buf))
+                buf["mean_singular_value"].append(np.mean(mean_lambda_buf))
+                buf["var_singular_value"].append(np.nanmean(variance_lambda_buf))  
 
-                    if "W_O" in data:
-                        in_proj = torch.from_numpy(data["W_O"])
-                        metrics_data = get_matrix_metrics(in_proj)
+                # Global weight and bias stats
+                if aggregated_weights:
+                    aggregated_weights = torch.cat(aggregated_weights)
+                    buf["mean_w"].append(aggregated_weights.mean().item())
+                    buf["median_w"].append(aggregated_weights.median().item())
+                    buf["var_w"].append(aggregated_weights.var().item())
+                if aggregated_biases:
+                    aggregated_biases = torch.cat(aggregated_biases)
+                    buf["mean_b"].append(aggregated_biases.mean().item())
+                    buf["median_b"].append(aggregated_biases.median().item())
+                    buf["var_b"].append(aggregated_biases.var().item())
 
-                        metrics_per_step[key]["in_proj"].append({"0": metrics_data})
+                # Training/evaluation metrics
+                buf["train_loss"].append(epoch_data.get("train_loss", None))
+                buf["eval_loss"].append(epoch_data.get("eval_loss", None))
+                buf["train_accuracy"].append(epoch_data.get("train_accuracy", None))
+                buf["eval_accuracy"].append(epoch_data.get("eval_accuracy", None))
 
-                        aggregated_weights[key].append(in_proj.view(-1))
+            # Write final buffer to CSV
+            with open(csv_file_path, mode="w", newline="") as csv_file:
+                writer = csv.writer(csv_file)
+                writer.writerow(buf.keys())
+                writer.writerows(zip(*buf.values()))
 
-                    if "W_in" in data:
-                        ffn_in = torch.from_numpy(data["W_in"])
-                        metrics_data = get_matrix_metrics(ffn_in)
-
-                        metrics_per_step[key]["ffn_in"].append({"0": metrics_data})
-
-                        aggregated_weights[key].append(ffn_in.view(-1))
-
-                    if "W_out" in data:
-                        ffn_out = torch.from_numpy(data["W_out"])
-                        metrics_data = get_matrix_metrics(ffn_out)
-
-                        metrics_per_step[key]["ffn_out"].append({"0": metrics_data})
-
-                        aggregated_weights[key].append(ffn_out.view(-1))
-
-                    if "b_in" in data:
-                        b_in = torch.from_numpy(data["b_in"])
-
-                        aggregated_biases[key].append(b_in.view(-1))
-
-                    if "b_out" in data:
-                        b_out = torch.from_numpy(data["b_out"])
-
-                        aggregated_biases[key].append(b_out.view(-1))
-
-                else:
-                    if key not in metrics_per_step:
-                        metrics_per_step[key] = {
-                            "step": step,
-                            "epoch": epoch,
-                            "w": [],
-                            "train_loss": train_data["train_loss"] if train_data else None,
-                            "eval_loss": train_data["eval_loss"] if train_data else None,
-                            "train_accuracy": accuracy_data["train_accuracy"] if accuracy_data else None,
-                            "eval_accuracy": accuracy_data["eval_accuracy"] if accuracy_data else None,
-                        }
-
-                        aggregated_weights[key] = []
-                        aggregated_biases[key] = []
-
-                    # Layer-specific metrics calculation
-                    if data["weight"] is not None:
-                        weights = torch.from_numpy(data["weight"])
-                        # Depending on tensor dimension, compute metrics
-                        if weights.dim() == 4:  # Conv2D layers
-                            metrics_data = get_tensor_metrics(weights)
-                        elif weights.dim() == 2:  # Linear layers
-                            metrics_data = get_matrix_metrics(weights)
-
-                        metrics_per_step[key]["w"].append(metrics_data)
-
-                        # Aggregate weights for global stats
-                        aggregated_weights[key].append(weights.view(-1))
-
-                    if data["bias"] is not None:
-                        biases = torch.from_numpy(data["bias"])
-                        # Aggregate biases for global stats
-                        aggregated_biases[key].append(biases.view(-1))
-
-        # Calculate and append global statistics for weights and biases
-        for (step, epoch), _ in metrics_per_step.items():
-            key = (step, epoch)
-
-            # Global weights statistics
-            if aggregated_weights[key]:
-                all_weights_combined = torch.cat(aggregated_weights[key])
-                w_all_stats = get_distribution_stats(all_weights_combined)
-            else:
-                w_all_stats = {}
-
-            # Global biases statistics
-            if aggregated_biases[key]:
-                all_biases_combined = torch.cat(aggregated_biases[key])
-                b_all_stats = get_distribution_stats(all_biases_combined)
-            else:
-                b_all_stats = {}
-
-            # Update the metrics for the step and epoch with global stats
-            metrics_per_step[key].update({"w_all": w_all_stats, "b_all": b_all_stats})
-
-        # Update the metrics cache with the aggregated metrics
-        self.metrics_cache = list(metrics_per_step.values())
-
-    def save_metrics(self):
-        """
-        Saving the metrics in a proper file directory structure.
-        """
-        metrics_by_epoch = {}
-        for metric in self.metrics_cache:
-            epoch = metric["epoch"]
-            if epoch not in metrics_by_epoch:
-                metrics_by_epoch[epoch] = []
-            metrics_by_epoch[epoch].append(metric)
-
-        for epoch, metrics in metrics_by_epoch.items():
-            highest_step_metric = max(metrics, key=lambda x: x["step"])
-
-            if self.config.get("is_transformer"):
-                filtered_metrics = {
-                    "k": highest_step_metric.get("k", {}),
-                    "q": highest_step_metric.get("q", {}),
-                    "v": highest_step_metric.get("v", {}),
-                    "in_proj": highest_step_metric.get("in_proj", {}),
-                    "ffn_in": highest_step_metric.get("ffn_in", {}),
-                    "ffn_out": highest_step_metric.get("ffn_out", {}),
-                    "w_all": highest_step_metric.get("w_all", {}),
-                    "b_all": highest_step_metric.get("b_all", {}),
-                    "train_loss": highest_step_metric.get("train_loss"),
-                    "eval_loss": highest_step_metric.get("eval_loss"),
-                    "train_accuracy": highest_step_metric.get("train_accuracy"),
-                    "eval_accuracy": highest_step_metric.get("eval_accuracy"),
-                    "grad_sym": highest_step_metric.get("grad_sym"),
-                    "train_dist_irr": highest_step_metric.get("train_dist_irr"),
-                    "test_dist_irr": highest_step_metric.get("test_dist_irr")
-                }
-
-                if self.config.get("clock_pizza_metrics"):
-                    filtered_metrics["grad_sym"] = highest_step_metric.get("grad_sym")
-                    filtered_metrics["dist_irr"] = highest_step_metric.get("dist_irr")
-
-            else:
-                filtered_metrics = {
-                    "w": highest_step_metric.get("w", {}),
-                    "w_all": highest_step_metric.get("w_all", {}),
-                    "b_all": highest_step_metric.get("b_all", {}),
-                    "train_loss": highest_step_metric.get("train_loss"),
-                    "eval_loss": highest_step_metric.get("eval_loss"),
-                    "train_accuracy": highest_step_metric.get("train_accuracy"),
-                    "eval_accuracy": highest_step_metric.get("eval_accuracy"),
-                }
-
-            metrics_filename = os.path.join(self.save_path, f"epoch{epoch}.json")
-            with open(metrics_filename, "w") as f:
-                json.dump(filtered_metrics, f, indent=4)
-
-    def train_and_save_metrics(self):
-        """
-        Wrapper function to train and save metrics in one go.
-        """
-        print(f"Training with seed {self.config['seed']}")
-        self.train()
-        print("Computing metrics")
-        self.compute_metrics()
-        print("Saving metrics")
-        self.save_metrics()
-        self.clear_weights_biases_cache()
-        self.clear_metrics_cache()
-        self.remove_hooks()
-        print(f"Finished training and saving metrics with seed {self.config['seed']}")
+            print(f"Metrics summary saved to {csv_file_path}")
+        print(f"Calculated and saved metrics for all training data")
+        
+    def close_hooks(self):
+        """Remove hooks from the model after training."""
+        for hook in self.hooks:
+            hook.remove()
