@@ -25,7 +25,7 @@ def visualize_hmm_loss(data, phase_col: str, epoch_col: str, loss_col: str,
         loss_col (str): column name for loss metric of the model
         hover_data (Dict): dictionary with column names as fields and bool value against them for visibility in tooltip during hover
     """
-    data['color'] = data.apply(lambda x: hex[x['phases']-1 % len(hex)], axis=1)
+    data['color'] = data.apply(lambda x: hex[int(x['phases']-1 % len(hex))], axis=1)
     x = data[epoch_col]
     x_label = epoch_col
     if log_y:
@@ -61,7 +61,7 @@ def visualize_hmm_loss(data, phase_col: str, epoch_col: str, loss_col: str,
     fig.show()
 
 
-def visualize_dag(transmat, node_hover_dict: Dict = None, 
+def visualize_states(transmat, node_hover_dict: Dict = None, 
                   edge_hover_dict: Dict = None, hex: List = HEX_VALUES):
 
     """Visualize HMM State Transitions
