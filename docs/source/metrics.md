@@ -21,7 +21,7 @@ List of metrics currently considered by the package for a hook point.
 | Gradient Symmetricity               | A Modular addition specific metric. Compute the cosine similarity between gradient vectors for the output logits w.r.t. input embeddings. Taking the average over many pairs yields the gradient symmetricity See [Zhong & Liu(2008)](https://arxiv.org/abs/2306.17844).                                                                                                                                                                                      | 2        |
 | Distant Irrelevance                 | A Modular addition specific metric. Measures the dependence of correct logits on differences between two inputs.                                                                                                                                                                                                                                                                                                                                              | 2        |
 
-#### Category Glossary:
+## Category Glossary:
 
 | Category | Description                                                                            |
 | -------- | -------------------------------------------------------------------------------------- |

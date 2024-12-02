@@ -4,7 +4,7 @@ import os
 import evaluate
 import torch
 from accelerate import Accelerator
-from visualize_training.metrics import (
+from visualizing_training.metrics import (
     distance_irrelevance,
     get_distribution_stats,
     get_matrix_metrics,
@@ -278,7 +278,7 @@ class ModelManager:
     def compute_metrics(self):
         """
         Computing the required metrics from the weights and biases cache. 
-        For the complete list of metrics, refer :doc:`source/metrics`
+        For the complete list of metrics, refer :doc:`source/metrics.md`
         """
         # Initialize a dictionary to hold the metrics per step and epoch
         metrics_per_step = {}

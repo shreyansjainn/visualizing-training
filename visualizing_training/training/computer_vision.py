@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from visualize_training.model import MLP, LeNet5
+from visualizing_training.model import MLP, LeNet5
 
 from torchvision import datasets, transforms
 import torchvision.models as models
@@ -21,8 +21,8 @@ import argparse
 import numpy as np
 
 
-from visualize_training.metrics import get_metrics_mlp, get_metrics_lenet5, get_metrics_resnet18
-from visualize_training.model import MyResNet, MyBasicBlock
+from visualizing_training.metrics import get_metrics_mlp, get_metrics_lenet5, get_metrics_resnet18
+from visualizing_training.model import MyResNet, MyBasicBlock
 
 # %%
 # replicating https://arxiv.org/pdf/2210.01117.pdf

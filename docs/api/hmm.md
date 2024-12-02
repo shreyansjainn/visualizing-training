@@ -1,6 +1,6 @@
-### HMM Module
+# HMM Module
 
 ```{eval-rst}
-.. automodule:: visualize_training.hmm
+.. automodule:: visualizing_training.hmm
    :members:
 ```

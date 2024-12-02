@@ -1,9 +1,9 @@
 import argparse
 import os
 
-from visualize_training.train import ModelManager
-from visualize_training.utils import training_run_json_to_csv, save_model
-from visualize_training.hmm import HMM
+from visualizing_training.train import ModelManager
+from visualizing_training.utils import training_run_json_to_csv, save_model
+from visualizing_training.hmm import HMM
 
 from pizza.model import Transformer
 from pizza.data import get_dataloaders, get_dataloaders_with_full_dataset

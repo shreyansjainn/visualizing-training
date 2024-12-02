@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.abspath('../'))
 
 # sys.modules['collections'] = PatchedCollections('collections')
 
-project = 'Visualize Training'
+project = 'Visualizing Training'
 copyright = '2024, shreyans jain'
 author = 'shreyans jain'
 release = '1.0'

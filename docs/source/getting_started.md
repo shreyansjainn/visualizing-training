@@ -6,7 +6,7 @@ While training a Neural Network, often our approach is just focused on the end o
 
 Our effort is to bring a change in that approach and offer a deep dive into those stages and above figure is a sneak peek into that. It shows the stages a neural network goes through during the training process.
 
-### Latent States
+## Latent States
 
 The stages can sometimes be referred to as `Phases` as well as `Latent States` and they can be defined as a state where the characteristics of the model are broadly falling under one consistent definition. For ex: A model can sometimes go through three stages like:
 
@@ -14,7 +14,7 @@ The stages can sometimes be referred to as `Phases` as well as `Latent States` a
 2. Model has memorized the training data but doesn't generalize well (Good training accuracy but bad accuracy on validation data)
 3. Model is able to generalize well on unseen data as well. (Good accuracy on both training and validation data)
 
-### Training Dynamics
+## Training Dynamics
 
 Transition between `Latent States` is often a result of sudden changes or inflection points in one or more defining metrics of the model performance. A sequence of these transitions is termed as a `Generalization Strategy` or `Training Dynamics` or a `Trajectory`
 
@@ -28,9 +28,9 @@ Our package here, offers a solution for analyzing and visualizing Training Dynam
 
 This library is heavily insipired by the early work done by [Michael Hu](https://michahu.github.io/) for the paper [Latent State Models of Training Dynamics](https://arxiv.org/abs/2308.09543).
 
-To get a deeper understanding of the inner workings check [Core Approach](./core_approach.md) and [Step By Step Guide](./step_by_step.md)
+To get a deeper understanding of the inner workings check the [Step By Step Guide](./step_by_step.md)
 
-### Installation
+## Installation
 
 ```
 pip install visualizing-training
@@ -39,10 +39,10 @@ pip install visualizing-training
 Import the library using
 
 ```
-import visualize_training
+import visualizing_training
 ```
 
-### Key Features
+## Key Features
 
 Key features include:
 
