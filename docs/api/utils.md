@@ -1,6 +1,6 @@
-### Utils Module
+# Utils Module
 
 ```{eval-rst}
-.. automodule:: visualize_training.utils
+.. automodule:: visualizing_training.utils
    :members:
 ```

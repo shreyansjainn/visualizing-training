@@ -1,6 +1,6 @@
-### Train Module
+# Train Module
 
 ```{eval-rst}
-.. automodule:: visualize_training.train
+.. automodule:: visualizing_training.train
    :members:
 ```

@@ -1,5 +1,8 @@
 # [Latent State Models of Training Dynamics](https://arxiv.org/abs/2308.09543)
 
+[![Read the Docs
+Here](https://img.shields.io/badge/-Read%20the%20Docs%20Here-blue?style=for-the-badge&logo=Read-the-Docs&logoColor=white&link=https://shreyansjainn.github.io/visualizing-training/)](https://shreyansjainn.github.io/visualizing-training/)
+
 Directly model training dynamics, then interpret the dynamics model
 
 # Setup
@@ -69,9 +72,9 @@ config = {
 ## Step 1: Training a model and collecting metrics
 
 ```python
-from src.training.modular_addition import get_dataloaders
-from src.model import Transformer
-from src.train import ModelManager
+from visualizing_training.training.modular_addition import get_dataloaders
+from visualizing_training.model import Transformer
+from visualizing_training.train import ModelManager
 
 for seed in range(n_seeds): # Saving the metrics for all the seeds
     config["seed"] = seed
@@ -104,7 +107,7 @@ print("Finished training and saving metrics for all seeds")
 Take the stats computed in step 1 and organize them into CSVs suitable for training the HMM.
 
 ```python
-from src.utils import training_run_json_to_csv
+from visualizing_training.utils import training_run_json_to_csv
 
 training_run_json_to_csv(config['run_output_dir'], is_transformer=True, has_loss=False, lr=lr, optimizer=config['optimizer'], init_scaling=config['init_scaling'], input_dir=config['run_output_dir'], n_seeds=n_seeds, clock_pizza_metrics=config['clock_pizza_metrics'])
 ```
@@ -114,7 +117,7 @@ training_run_json_to_csv(config['run_output_dir'], is_transformer=True, has_loss
 Model selection computes the AIC-BIC-log-likelihood curves for varying number of hidden states in the HMM and saves out the best model for each number of hidden states.
 
 ```python
-from src.hmm import HMM
+from visualizing_training.hmm import HMM
 
 max_components = 8 # max no of components for which HMM will be trained
 cov_type = "diag" # type of covariance for HMM model
@@ -133,7 +136,7 @@ hmm_output = hmm_model.get_avg_log_likelihood(data_dir, cols)
 Visualizing average log-likelihood, along with AIC and BIC helps with the model selection for the different HMM models we have trained. Currently we are selecting the HMM model with the lowest BIC.
 
 ```python
-from src.visualize import visualize_avg_log_likelihood,
+from visualizing_training.visualize import visualize_avg_log_likelihood,
 
 visualize_avg_log_likelihood(hmm_output,'modular_demo_run')
 ```
@@ -150,7 +153,7 @@ save_model(model_path,hmm_output)
 Calculating feature importance to shortlist top n most important features contributing to a state transition
 
 ```python
-from src.utils import munge_data
+from visualizing_training.utils import munge_data
 
 n_components = 8 # best model chosen from the visualization
 model_path = 'model_path.pkl'
@@ -167,11 +170,11 @@ state_transitions = hmm_model.feature_importance(cols, data, best_predictions,ph
 Visualizing state transitions using a DAG visualization which allows the user to interact with it for deeper insight into the training dynamics.
 
 ```python
-from src.visualize import visualize_dag
+from visualizing_training.visualize import visualize_states
 
 best_model_transmat = model.transmat_
 
-visualize_dag(best_model_transmat, edge_hover_dict = state_transitions)
+visualize_states(best_model_transmat, edge_hover_dict = state_transitions)
 ```
 
 # Citation
