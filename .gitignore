@@ -10,6 +10,7 @@ wandb
 markov_chain*
 figures/
 data.bak
+modular_demo_run
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
