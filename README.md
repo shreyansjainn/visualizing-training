@@ -18,14 +18,14 @@ pip install visualizing-training
 For installing the package in editable mode, directly clone the repo and install the package.
 
 ```bash
-git clone https://github.com/michahu/visualizing-training.git
+git clone https://github.com/shreyansjainn/visualizing-training.git
 
 pip install -e .
 ```
 
 # Usage
 
-Below set of commands will walk you through the usage of the package, [demo_run](https://github.com/michahu/visualizing-training/blob/main/demo_run.ipynb) notebook can be referred for a notebook version of the same.
+Below set of commands will walk you through the usage of the package, [demo_run](https://github.com/shreyansjainn/visualizing-training/blob/main/experimentation/notebooks/demo_run.ipynb) notebook can be referred for a notebook version of the same.
 
 ## Step 0: Config Setup.
 
